@@ -17,8 +17,21 @@ extension TorrentSearch {
         skip: Int = 0
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
-        let base = isAnime ? kitsuBase : cinemetaBase
-        var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feed.rawValue)"
+        
+        // Меняем базу с Cinemeta на TMDB с поддержкой русского языка
+        let base = isAnime ? kitsuBase : "https://tmdb.strem.fun/language=ru"
+        
+        // Адаптируем названия каталогов под базу TMDB
+        var feedName = isAnime ? feed.kitsuCatalog : feed.rawValue
+        if !isAnime {
+            if feedName == "top" || feedName == "popular" { 
+                feedName = "tmdb.popular" 
+            } else { 
+                feedName = "tmdb.top_rated" 
+            }
+        }
+        
+        var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(feedName)"
         var extras: [String] = []
         if let genre, !genre.isEmpty {
             let encoded = genre.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? genre
@@ -31,12 +44,15 @@ extension TorrentSearch {
         let (data, _) = try await URLSession.shared.data(for: Self.request(url))
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let metas = json?["metas"] as? [[String: Any]] ?? []
-        return metas.compactMap { Self.parseResult($0, type: isAnime ? .series : type) }
+        return metas.compactMap { Self.parseResult(\$0, type: isAnime ? .series : type) }
     }
 
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
-        let base = isKitsu ? kitsuBase : cinemetaBase
+        
+        // Меняем базу на TMDB с русским языком для страницы фильма
+        let base = isKitsu ? kitsuBase : "https://tmdb.strem.fun/language=ru"
+        
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
         guard let url = URL(string: "\(base)/meta/\(typePath)/\(safeID).json") else {
@@ -106,85 +122,4 @@ extension TorrentSearch {
     private static func parseTrailers(_ any: Any?) -> [String] {
         guard let list = any as? [[String: Any]] else { return [] }
         let items = list.compactMap { entry -> (id: String, isTrailer: Bool)? in
-            guard let id = entry["source"] as? String, !id.isEmpty else { return nil }
-            return (id, (entry["type"] as? String)?.lowercased() == "trailer")
-        }
-        return items.filter(\.isTrailer).map(\.id) + items.filter { !$0.isTrailer }.map(\.id)
-    }
-
-    private static func intValue(_ any: Any?) -> Int? {
-        switch any {
-        case let number as Int: number
-        case let number as Double: Int(number)
-        case let text as String: Int(text)
-        default: nil
-        }
-    }
-
-    private static func parseEpisode(_ video: [String: Any]) -> Episode? {
-        guard let id = video["id"] as? String else { return nil }
-        let season = video["season"] as? Int ?? 0
-        guard let number = video["episode"] as? Int ?? video["number"] as? Int else { return nil }
-
-        return Episode(
-            id: id,
-            season: season,
-            episode: number,
-            name: (video["name"] as? String) ?? "Episode \(number)",
-            overview: (video["overview"] as? String) ?? (video["description"] as? String),
-            thumbnailURL: (video["thumbnail"] as? String).flatMap(URL.init(string:)),
-            released: (video["released"] as? String ?? video["firstAired"] as? String).flatMap(parseDate)
-        )
-    }
-
-    private static func stringValue(_ any: Any?) -> String? {
-        switch any {
-        case let text as String: text
-        case let number as Int: String(number)
-        case let number as Double: String(Int(number))
-        default: nil
-        }
-    }
-
-    private static func doubleValue(_ any: Any?) -> Double? {
-        switch any {
-        case let number as Double: number
-        case let number as Int: Double(number)
-        case let text as String: Double(text)
-        default: nil
-        }
-    }
-
-    private static func stringList(_ any: Any?) -> [String] {
-        switch any {
-        case let list as [String]: list
-        case let single as String: [single]
-        default: []
-        }
-    }
-
-    private static func parseDate(_ text: String) -> Date? {
-        ISO8601DateFormatter().date(from: text)
-            ?? ISO8601DateFormatter.withFractionalSeconds.date(from: text)
-    }
-}
-
-nonisolated public enum CatalogError: Error, LocalizedError {
-    case notFound(String)
-    case badURL
-
-    public var errorDescription: String? {
-        switch self {
-        case .notFound(let id): "No metadata for \(id)."
-        case .badURL: "Couldn’t build a valid catalog URL."
-        }
-    }
-}
-
-nonisolated extension ISO8601DateFormatter {
-    nonisolated(unsafe) static let withFractionalSeconds: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-}
+            guard let id = entry
