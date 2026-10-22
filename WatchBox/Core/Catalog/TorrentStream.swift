@@ -2,8 +2,6 @@
 //  TorrentStream.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 29.07.26.
-//
 
 import Foundation
 
@@ -18,6 +16,36 @@ nonisolated public struct TorrentStream: Identifiable, Sendable {
     public let sizeText: String?
     public let resolution: String?
     public let url: URL?
+
+    // Добавляем ручной инициализатор для подмены отображаемого имени
+    public init(
+        id: String,
+        title: String,
+        displayName: String,
+        infoHash: Data,
+        fileIndex: Int? = nil,
+        trackers: [URL],
+        seeders: Int? = nil,
+        sizeText: String? = nil,
+        resolution: String? = nil,
+        url: URL? = nil
+    ) {
+        self.id = id
+        self.title = title
+        
+        // ВАЖНО: Подменяем короткое имя на полное название релиза из Torrentio,
+        // которое содержит информацию о трекере, языке и качестве
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.displayName = cleanTitle.isEmpty ? displayName : cleanTitle
+        
+        self.infoHash = infoHash
+        self.fileIndex = fileIndex
+        self.trackers = trackers
+        self.seeders = seeders
+        self.sizeText = sizeText
+        self.resolution = resolution
+        self.url = url
+    }
 
     public var magnet: MagnetLink {
         MagnetLink(infoHash: infoHash, displayName: displayName, trackers: trackers)
