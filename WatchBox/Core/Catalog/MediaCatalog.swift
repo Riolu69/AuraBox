@@ -122,4 +122,8 @@ extension TorrentSearch {
     private static func parseTrailers(_ any: Any?) -> [String] {
         guard let list = any as? [[String: Any]] else { return [] }
         let items = list.compactMap { entry -> (id: String, isTrailer: Bool)? in
-            guard let id = entry
+            guard let id = entry["source"] as? String, !id.isEmpty else { return nil }
+            return (id, (entry["type"] as? String)?.lowercased() == "trailer")
+        }
+        return items.filter(\.isTrailer).map(\.id) + items.filter { !$0.isTrailer }.map(\.id)
+    }
