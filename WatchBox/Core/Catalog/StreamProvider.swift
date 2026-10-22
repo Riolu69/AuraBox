@@ -35,8 +35,9 @@ public enum StreamProvider: String, CaseIterable, Identifiable, Sendable {
 
         switch self {
         case .torrentio:
-            let plain = "https://torrentio.strem.fun"
-            return torrentioConfig.isEmpty ? plain : "\(plain)/\(torrentioConfig)"
+        let base = "https://torrentio.strem.fun"
+        let defaultCfg = "providers=rutor,rutracker,kinozal,1337x,torrentgalaxy%7Clanguage=russian"
+        return torrentioConfig.isEmpty ? "\(base)/\(defaultCfg)" : "\(base)/\(torrentioConfig)"
 
         case .comet:
             guard communityDebrid, let service = debrid.cometService else { return nil }
