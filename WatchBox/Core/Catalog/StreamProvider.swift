@@ -36,7 +36,7 @@ public enum StreamProvider: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .torrentio:
         let base = "https://torrentio.strem.fun"
-        let defaultCfg = "providers=rutor,rutracker,kinozal,1337x,torrentgalaxy%7Clanguage=russian"
+        let defaultCfg = "providers=rutor,rutracker,kinozal,1337x,torrentgalaxy,nyaa%7Clanguage=russian"
         return torrentioConfig.isEmpty ? "\(base)/\(defaultCfg)" : "\(base)/\(torrentioConfig)"
 
         case .comet:
