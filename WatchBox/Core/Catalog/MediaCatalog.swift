@@ -16,24 +16,27 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // Надежный TMDB провайдер с русским языком
-        let base = isAnime ? kitsuBase : "https://94c8cb9f702d-tmdb-addon.baby-beamup.club/ru-RU"
+        // Официальный стабильный сервер TMDB с русским языком
+        let base = isAnime ? kitsuBase : "https://tmdb-addon.strem.fun/language=ru"
         
         var feedName = isAnime ? feed.kitsuCatalog : feed.rawValue
         if !isAnime {
             if feedName == "top" || feedName == "popular" { 
                 feedName = "tmdb.popular" 
             } else { 
-                feedName = "tmdb.top_rated" 
+                feedName = "tmdb.top" 
             }
         }
         
         var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(feedName)"
         var extras: [String] = []
-        if let genre, !genre.isEmpty {
+        
+        // Защита от сбоев: TMDB иногда крашится от фильтров жанров, поэтому применяем их только для Аниме
+        if isAnime, let genre, !genre.isEmpty {
             let encoded = genre.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? genre
             extras.append("genre=\(encoded)")
         }
+        
         if skip > 0 { extras.append("skip=\(skip)") }
         if !extras.isEmpty { path += "/" + extras.joined(separator: "&") }
 
@@ -47,7 +50,7 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        let base = isKitsu ? kitsuBase : "https://94c8cb9f702d-tmdb-addon.baby-beamup.club/ru-RU"
+        let base = isKitsu ? kitsuBase : "https://tmdb-addon.strem.fun/language=ru"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
