@@ -16,27 +16,15 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // Официальный стабильный сервер TMDB с русским языком
-        let base = isAnime ? kitsuBase : "https://tmdb-addon.strem.fun/language=ru"
+        // Возвращаем официальный, сверхстабильный сервер Cinemeta
+        let base = isAnime ? kitsuBase : "https://v3-cinemeta.strem.io"
         
-        var feedName = isAnime ? feed.kitsuCatalog : feed.rawValue
-        if !isAnime {
-            if feedName == "top" || feedName == "popular" { 
-                feedName = "tmdb.popular" 
-            } else { 
-                feedName = "tmdb.top" 
-            }
-        }
-        
-        var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(feedName)"
+        var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feed.rawValue)"
         var extras: [String] = []
-        
-        // Защита от сбоев: TMDB иногда крашится от фильтров жанров, поэтому применяем их только для Аниме
-        if isAnime, let genre, !genre.isEmpty {
+        if let genre, !genre.isEmpty {
             let encoded = genre.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? genre
             extras.append("genre=\(encoded)")
         }
-        
         if skip > 0 { extras.append("skip=\(skip)") }
         if !extras.isEmpty { path += "/" + extras.joined(separator: "&") }
 
@@ -50,7 +38,8 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        let base = isKitsu ? kitsuBase : "https://tmdb-addon.strem.fun/language=ru"
+        // Возвращаем Cinemeta для загрузки карточек фильмов
+        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
