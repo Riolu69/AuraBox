@@ -2,8 +2,6 @@
 //  MediaCatalog.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 31.07.26.
-//
 
 import Foundation
 
@@ -18,10 +16,9 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // Меняем базу с Cinemeta на TMDB с поддержкой русского языка
-        let base = isAnime ? kitsuBase : "https://tmdb.strem.fun/language=ru"
+        // Надежный TMDB провайдер с русским языком
+        let base = isAnime ? kitsuBase : "https://94c8cb9f702d-tmdb-addon.baby-beamup.club/ru-RU"
         
-        // Адаптируем названия каталогов под базу TMDB
         var feedName = isAnime ? feed.kitsuCatalog : feed.rawValue
         if !isAnime {
             if feedName == "top" || feedName == "popular" { 
@@ -50,8 +47,7 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        // Меняем базу на TMDB с русским языком для страницы фильма
-        let base = isKitsu ? kitsuBase : "https://tmdb.strem.fun/language=ru"
+        let base = isKitsu ? kitsuBase : "https://94c8cb9f702d-tmdb-addon.baby-beamup.club/ru-RU"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
