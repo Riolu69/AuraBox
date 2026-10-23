@@ -137,7 +137,7 @@ final class AppSettings {
         didSet { persist(subtitleScale, .subtitleScale) }
     }
 
-    var preferredAudioLanguage: String = "en" {
+    var preferredAudioLanguage: String = "ru" {
         didSet { persist(preferredAudioLanguage, .preferredAudioLanguage) }
     }
 
@@ -149,7 +149,7 @@ final class AppSettings {
     ]
 
     /// Arabic unless the viewer picked something else in Settings.
-    var preferredSubtitleLanguage: String = "ara" {
+    var preferredSubtitleLanguage: String = "off" {
         didSet { persist(preferredSubtitleLanguage, .preferredSubtitleLanguage) }
     }
 
