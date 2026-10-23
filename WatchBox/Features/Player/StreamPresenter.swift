@@ -1,14 +1,25 @@
 //
 //  StreamPresenter.swift
-//  SceneBox
-//
-//  Created by SpontaneousArray on 10.08.26.
+//  MovieStream
 //
 
 import SwiftUI
 import Kingfisher
+import AVKit
+
+// MARK: - Встроенный переводчик
+fileprivate func tr(_ key: String, _ lang: String) -> String {
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "Play now": "Начать просмотр",
+        "Try another source": "Другой источник",
+        "Close": "Закрыть"
+    ]
+    return dict[key] ?? key
+}
 
 struct StreamPlayerContainer: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let streamer: StreamCoordinator
     @Environment(AppSettings.self) private var settings
     @Environment(\.scenePhase) private var scenePhase
@@ -18,21 +29,30 @@ struct StreamPlayerContainer: View {
             Color.black.ignoresSafeArea()
 
             if let target = streamer.target {
-                PlaybackScreen(
-                    url: target.url,
-                    title: target.title,
-                    stats: target.showsTorrentStats ? streamer.stats : nil,
-                    subtitleContext: target.subtitleContext,
-                    episodes: streamer.episodePlaylist,
-                    startAt: target.startPosition,
-                    progress: target.progress,
-                    artworkURL: streamer.backdropURL,
-                    originalAudioLanguage: target.originalAudioLanguage,
-                    onRecover: { await streamer.recoveryURL() },
-                    onClose: streamer.stop
-                )
-                .id(target.url)   // rebuild the player for a new episode's stream
-                .environment(settings)
+                // MARK: Гибридный плеер
+                // Если формат поддерживается Apple (mp4, m3u8) — запускаем нативный плеер с PiP и AirPlay
+                if target.isAppleSupported {
+                    NativePlaybackScreen(target: target, onClose: streamer.stop)
+                        .id(target.url)
+                        .environment(settings)
+                } else {
+                    // Иначе падаем на всеядный VLC для MKV и тяжелых контейнеров
+                    PlaybackScreen(
+                        url: target.url,
+                        title: target.title,
+                        stats: target.showsTorrentStats ? streamer.stats : nil,
+                        subtitleContext: target.subtitleContext,
+                        episodes: streamer.episodePlaylist,
+                        startAt: target.startPosition,
+                        progress: target.progress,
+                        artworkURL: streamer.backdropURL,
+                        originalAudioLanguage: target.originalAudioLanguage,
+                        onRecover: { await streamer.recoveryURL() },
+                        onClose: streamer.stop
+                    )
+                    .id(target.url)
+                    .environment(settings)
+                }
             } else {
                 PreparingPlayerView(
                     backdropURL: streamer.backdropURL,
@@ -57,6 +77,104 @@ struct StreamPlayerContainer: View {
         .overlay(alignment: .topTrailing) { DiagnosticsOverlay() }
         #endif
     }
+}
+
+// MARK: - Apple AVPlayer (Native) 
+/// Дает автоматическую поддержку Picture-in-Picture и полноценный AirPlay.
+private struct NativePlaybackScreen: View {
+    let target: StreamCoordinator.Target
+    let onClose: () -> Void
+    
+    @State private var player: AVPlayer?
+    @State private var timeObserver: Any?
+    
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            if let player = player {
+                NativeAVPlayerView(player: player)
+                    .ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+            
+            // Пользовательская кнопка "Закрыть", накладываемая поверх плеера
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(.black.opacity(0.45), in: Circle())
+            }
+            #if os(tvOS)
+            .padding(.leading, 50)
+            .padding(.top, 40)
+            #else
+            .padding(.horizontal, 24)
+            .padding(.top, 56)
+            #endif
+        }
+        .onAppear {
+            let avPlayer = AVPlayer(url: target.url)
+            
+            // Восстановление позиции
+            let startSec = target.startPosition.asSeconds
+            if startSec > 0 {
+                avPlayer.seek(to: CMTime(seconds: startSec, preferredTimescale: 1))
+            }
+            
+            avPlayer.play()
+            self.player = avPlayer
+            
+            // Периодическое сохранение прогресса в историю
+            let interval = CMTime(seconds: 5, preferredTimescale: 1)
+            timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+                guard let progress = target.progress else { return }
+                let position = time.seconds
+                let dur = avPlayer.currentItem?.duration.seconds ?? 0
+                if position > 0 {
+                    WatchProgressStore.shared.record(
+                        id: progress.mediaID, mediaType: progress.mediaType, title: progress.title,
+                        posterURL: progress.posterURL, season: progress.season,
+                        episode: progress.episode, episodeID: progress.episodeID,
+                        position: Duration.seconds(position),
+                        duration: Duration.seconds(dur.isNaN ? 0 : dur),
+                        publish: false
+                    )
+                }
+            }
+        }
+        .onDisappear {
+            if let obs = timeObserver { player?.removeTimeObserver(obs) }
+            player?.pause()
+            
+            // Финальное сохранение прогресса при закрытии
+            guard let player = player, let progress = target.progress else { return }
+            let position = player.currentTime().seconds
+            let dur = player.currentItem?.duration.seconds ?? 0
+            if position > 0 {
+                WatchProgressStore.shared.record(
+                    id: progress.mediaID, mediaType: progress.mediaType, title: progress.title,
+                    posterURL: progress.posterURL, season: progress.season,
+                    episode: progress.episode, episodeID: progress.episodeID,
+                    position: Duration.seconds(position),
+                    duration: Duration.seconds(dur.isNaN ? 0 : dur),
+                    publish: true
+                )
+            }
+        }
+    }
+}
+
+/// Обёртка контроллера UIKit для работы PiP
+private struct NativeAVPlayerView: UIViewControllerRepresentable {
+    let player: AVPlayer
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.allowsPictureInPicturePlayback = true
+        return controller
+    }
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
 }
 
 #if DEBUG
@@ -87,6 +205,7 @@ private struct DiagnosticsOverlay: View {
 #endif
 
 private struct PreparingPlayerView: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let backdropURL: URL?
     let logoURL: URL?
     let title: String
@@ -121,10 +240,8 @@ private struct PreparingPlayerView: View {
                                 .animation(.default, value: status)
                         }
                         if canStartNow {
-                            // Enough is downloaded to begin; the rest keeps coming
-                            // in ahead of the playhead.
                             Button(action: onStartNow) {
-                                Label("Play now", systemImage: "play.fill")
+                                Label(tr("Play now", appLanguage), systemImage: "play.fill")
                                     .font(.subheadline.weight(.bold))
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 10)
@@ -135,9 +252,8 @@ private struct PreparingPlayerView: View {
                             .transition(.scale(scale: 0.9).combined(with: .opacity))
                         }
                         if canTryAnother {
-                            // Slow to start: the next best source is one tap away.
                             Button(action: onTryAnother) {
-                                Label("Try another source", systemImage: "arrow.triangle.2.circlepath")
+                                Label(tr("Try another source", appLanguage), systemImage: "arrow.triangle.2.circlepath")
                                     .font(.subheadline.weight(.semibold))
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -214,7 +330,7 @@ private struct PreparingPlayerView: View {
                 .font(.callout)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
-            Button("Close", action: onClose)
+            Button(tr("Close", appLanguage), action: onClose)
                 .buttonStyle(.borderedProminent)
                 .tint(.white)
                 .foregroundStyle(.black)
