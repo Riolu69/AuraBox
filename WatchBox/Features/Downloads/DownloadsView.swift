@@ -7,6 +7,46 @@
 
 import SwiftUI
 
+// MARK: - Встроенный переводчик
+fileprivate func tr(_ key: String, _ lang: String) -> String {
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "No downloads yet": "Пока нет загрузок",
+        "Tap Download on a movie or episode to keep it on this device for offline viewing.": "Нажмите «Скачать» на фильме или серии, чтобы сохранить их для просмотра без интернета.",
+        "Delete": "Удалить",
+        "Cancel": "Отмена",
+        "Play": "Смотреть",
+        "Pause": "Пауза",
+        "Resume": "Продолжить",
+        "Retry": "Повторить",
+        "Pause all": "Пауза для всех",
+        "Resume all": "Возобновить все",
+        "Resume All": "Возобновить все",
+        "Pause All": "Пауза для всех",
+        "Delete All Episodes": "Удалить все эпизоды",
+        "Watched": "Просмотрено",
+        "Paused": "На паузе",
+        "in progress": "в процессе",
+        "Resume to keep downloading.": "Возобновите, чтобы продолжить загрузку.",
+        "Connecting to peers…": "Подключение к пирам…",
+        " active": " активно",
+        " of ": " из ",
+        "Using ": "Используется ",
+        " on this device": " на этом устройстве",
+        " episodes": " эпизодов",
+        " downloading": " загружается",
+        " ready": " готово",
+        " watched": " просмотрено",
+        "Delete download?": "Удалить загрузку?",
+        "episodes?": "эпизодов?",
+        " will be removed from this device.": " будет удален с этого устройства.",
+        "Every downloaded episode of ": "Все скачанные эпизоды ",
+        "Collapses the episode list": "Свернуть список",
+        "Shows every downloaded episode": "Показать все эпизоды"
+    ]
+    return dict[key] ?? key
+}
+
 /// All downloads for one title. A show's episodes fold into a single row that
 /// expands; a movie is a group of one.
 struct DownloadGroup: Identifiable {
@@ -55,6 +95,7 @@ extension DownloadRecord {
 }
 
 struct DownloadsView: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     @Environment(DownloadStore.self) private var store
     @Environment(AppSettings.self) private var settings
     @Environment(WatchProgressStore.self) private var progress
@@ -68,8 +109,8 @@ struct DownloadsView: View {
 
         var id: String {
             switch self {
-            case .one(let download): "one-\(download.id)"
-            case .group(let group): "group-\(group.id)"
+            case .one(let download): return "one-\(download.id)"
+            case .group(let group): return "group-\(group.id)"
             }
         }
     }
@@ -80,8 +121,8 @@ struct DownloadsView: View {
             if store.downloads.isEmpty {
                 EmptyStateView(
                     systemImage: "arrow.down.circle",
-                    title: "No downloads yet",
-                    message: "Tap Download on a movie or episode to keep it on this device for offline viewing.")
+                    title: tr("No downloads yet", appLanguage),
+                    message: tr("Tap Download on a movie or episode to keep it on this device for offline viewing.", appLanguage))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     #if os(tvOS)
                     .frame(minHeight: 500)   // hosted in Library's ScrollView
@@ -114,7 +155,7 @@ struct DownloadsView: View {
         }
         .alert(deleteTitle, isPresented: Binding(get: { pendingDelete != nil },
                                                  set: { if !$0 { pendingDelete = nil } })) {
-            Button("Delete", role: .destructive) {
+            Button(tr("Delete", appLanguage), role: .destructive) {
                 switch pendingDelete {
                 case .one(let download): store.remove(download)
                 case .group(let group): group.items.forEach { store.remove($0) }
@@ -122,7 +163,7 @@ struct DownloadsView: View {
                 }
                 pendingDelete = nil
             }
-            Button("Cancel", role: .cancel) { pendingDelete = nil }
+            Button(tr("Cancel", appLanguage), role: .cancel) { pendingDelete = nil }
         } message: {
             Text(deleteMessage)
         }
@@ -178,7 +219,7 @@ struct DownloadsView: View {
                 }
             }
 
-            Text("Using \(ByteFormat.size(store.diskUsage)) on this device")
+            Text(tr("Using ", appLanguage) + "\(ByteFormat.size(store.diskUsage))" + tr(" on this device", appLanguage))
                 .font(.footnote)
                 .foregroundStyle(Theme.textTertiary)
                 .frame(maxWidth: .infinity)
@@ -196,7 +237,7 @@ struct DownloadsView: View {
 
     private func deleteButton(_ action: @escaping () -> Void) -> some View {
         Button(role: .destructive, action: action) {
-            Label("Delete", systemImage: "trash")
+            Label(tr("Delete", appLanguage), systemImage: "trash")
         }
     }
 
@@ -204,14 +245,14 @@ struct DownloadsView: View {
     private func itemMenu(_ download: Download) -> some View {
         switch download.phase {
         case .completed:
-            Button { primaryAction(for: download) } label: { Label("Play", systemImage: "play.fill") }
+            Button { primaryAction(for: download) } label: { Label(tr("Play", appLanguage), systemImage: "play.fill") }
         case .downloading, .resolving, .queued:
-            Button { store.pause(download) } label: { Label("Pause", systemImage: "pause.fill") }
+            Button { store.pause(download) } label: { Label(tr("Pause", appLanguage), systemImage: "pause.fill") }
         case .paused, .failed:
-            Button { store.resume(download) } label: { Label("Resume", systemImage: "arrow.down") }
+            Button { store.resume(download) } label: { Label(tr("Resume", appLanguage), systemImage: "arrow.down") }
         }
         Button(role: .destructive) { pendingDelete = .one(download) } label: {
-            Label("Delete", systemImage: "trash")
+            Label(tr("Delete", appLanguage), systemImage: "trash")
         }
     }
 
@@ -220,15 +261,15 @@ struct DownloadsView: View {
         if group.items.contains(where: { $0.phase == .paused || $0.phase == .failed }) {
             Button {
                 group.items.filter { $0.phase == .paused || $0.phase == .failed }.forEach { store.resume($0) }
-            } label: { Label("Resume All", systemImage: "arrow.down") }
+            } label: { Label(tr("Resume All", appLanguage), systemImage: "arrow.down") }
         }
         if group.pendingCount > 0 {
             Button {
                 group.items.filter(\.phase.isPending).forEach { store.pause($0) }
-            } label: { Label("Pause All", systemImage: "pause.fill") }
+            } label: { Label(tr("Pause All", appLanguage), systemImage: "pause.fill") }
         }
         Button(role: .destructive) { pendingDelete = .group(group) } label: {
-            Label("Delete All Episodes", systemImage: "trash")
+            Label(tr("Delete All Episodes", appLanguage), systemImage: "trash")
         }
     }
     #endif
@@ -256,8 +297,8 @@ struct DownloadsView: View {
 
     private var deleteTitle: String {
         switch pendingDelete {
-        case .group(let group): "Delete \(group.items.count) episodes?"
-        default: "Delete download?"
+        case .group(let group): return tr("Delete", appLanguage) + " \(group.items.count) " + tr("episodes?", appLanguage)
+        default: return tr("Delete download?", appLanguage)
         }
     }
 
@@ -265,9 +306,9 @@ struct DownloadsView: View {
         switch pendingDelete {
         case .one(let download):
             let name = [download.record.title, download.record.episodeLabel].compactMap { $0 }.joined(separator: " ")
-            return "\(name) will be removed from this device."
+            return "\(name)" + tr(" will be removed from this device.", appLanguage)
         case .group(let group):
-            return "Every downloaded episode of \(group.title) will be removed from this device."
+            return tr("Every downloaded episode of ", appLanguage) + "\(group.title)" + tr(" will be removed from this device.", appLanguage)
         case nil:
             return ""
         }
@@ -325,6 +366,7 @@ struct DownloadsView: View {
 #if !os(tvOS)
 /// Total transfer state with the bulk controls.
 private struct TransferSummary: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let store: DownloadStore
 
     var body: some View {
@@ -340,12 +382,12 @@ private struct TransferSummary: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(pending.isEmpty ? "Paused" : "\(pending.count) in progress")
+                    Text(pending.isEmpty ? tr("Paused", appLanguage) : "\(pending.count) " + tr("in progress", appLanguage))
                         .font(.display(22, weight: .bold))
                         .foregroundStyle(.white)
                     Text(pending.isEmpty
-                         ? "Resume to keep downloading."
-                         : (rate > 0 ? "\(ByteFormat.rate(rate)) · \(active.count) active" : "Connecting to peers…"))
+                         ? tr("Resume to keep downloading.", appLanguage)
+                         : (rate > 0 ? "\(ByteFormat.rate(rate)) · \(active.count)" + tr(" active", appLanguage) : tr("Connecting to peers…", appLanguage)))
                         .font(.subheadline)
                         .monospacedDigit()
                         .foregroundStyle(Theme.textSecondary)
@@ -354,13 +396,13 @@ private struct TransferSummary: View {
                 Spacer(minLength: 8)
                 if !pending.isEmpty {
                     Button { store.pauseAll() } label: {
-                        Label("Pause all", systemImage: "pause.fill")
+                        Label(tr("Pause all", appLanguage), systemImage: "pause.fill")
                     }
                     .buttonStyle(.bordered)
                     .tint(.white)
                 } else if canResume {
                     Button { store.resumeAll() } label: {
-                        Label("Resume all", systemImage: "arrow.down")
+                        Label(tr("Resume all", appLanguage), systemImage: "arrow.down")
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
@@ -370,7 +412,7 @@ private struct TransferSummary: View {
             if total > 0 {
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
                     .tint(Theme.accent)
-                Text("\(ByteFormat.size(done)) of \(ByteFormat.size(total))")
+                Text("\(ByteFormat.size(done))" + tr(" of ", appLanguage) + "\(ByteFormat.size(total))")
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(Theme.textTertiary)
@@ -385,6 +427,7 @@ private struct TransferSummary: View {
 }
 
 private struct GroupHeaderRow: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let group: DownloadGroup
     let isExpanded: Bool
     let watchedCount: Int
@@ -425,22 +468,23 @@ private struct GroupHeaderRow: View {
         .padding(.vertical, 6)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint(isExpanded ? "Collapses the episode list" : "Shows every downloaded episode")
+        .accessibilityHint(isExpanded ? tr("Collapses the episode list", appLanguage) : tr("Shows every downloaded episode", appLanguage))
     }
 
     private var summary: String {
-        var parts = ["\(group.items.count) episodes"]
+        var parts = ["\(group.items.count)" + tr(" episodes", appLanguage)]
         if group.pendingCount > 0 {
-            parts.append("\(group.pendingCount) downloading")
+            parts.append("\(group.pendingCount)" + tr(" downloading", appLanguage))
         } else if group.completedCount < group.items.count {
-            parts.append("\(group.completedCount) ready")
+            parts.append("\(group.completedCount)" + tr(" ready", appLanguage))
         }
-        if watchedCount > 0 { parts.append("\(watchedCount) watched") }
+        if watchedCount > 0 { parts.append("\(watchedCount)" + tr(" watched", appLanguage)) }
         return parts.joined(separator: ", ")
     }
 }
 
 private struct DownloadItemRow: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     enum Style { case standalone, episode }
 
     let download: Download
@@ -506,8 +550,8 @@ private struct DownloadItemRow: View {
 
     private var titleLine: String {
         switch style {
-        case .standalone: download.record.title
-        case .episode: download.phase == .completed
+        case .standalone: return download.record.title
+        case .episode: return download.phase == .completed
             ? ByteFormat.size(download.record.totalBytes)
             : download.statusText
         }
@@ -526,7 +570,7 @@ private struct DownloadItemRow: View {
                     .tint(.white.opacity(0.7))
                     .frame(maxWidth: 140)
             } else if watched {
-                Label("Watched", systemImage: "checkmark")
+                Label(tr("Watched", appLanguage), systemImage: "checkmark")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.textSecondary)
             } else {
@@ -564,18 +608,18 @@ private struct DownloadItemRow: View {
 
     private var primaryIcon: String {
         switch download.phase {
-        case .completed: "play.circle.fill"
-        case .downloading, .resolving, .queued: "pause.circle.fill"
-        case .paused, .failed: "arrow.down.circle.fill"
+        case .completed: return "play.circle.fill"
+        case .downloading, .resolving, .queued: return "pause.circle.fill"
+        case .paused, .failed: return "arrow.down.circle.fill"
         }
     }
 
     private var primaryLabel: String {
         switch download.phase {
-        case .completed: "Play"
-        case .downloading, .resolving, .queued: "Pause"
-        case .paused: "Resume"
-        case .failed: "Retry"
+        case .completed: return tr("Play", appLanguage)
+        case .downloading, .resolving, .queued: return tr("Pause", appLanguage)
+        case .paused: return tr("Resume", appLanguage)
+        case .failed: return tr("Retry", appLanguage)
         }
     }
 }
@@ -584,6 +628,7 @@ private struct DownloadItemRow: View {
 // MARK: - Row (tvOS)
 
 private struct DownloadRow: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let download: Download
     let onPrimary: () -> Void
     let onDelete: () -> Void
@@ -630,9 +675,9 @@ private struct DownloadRow: View {
 
     private var primaryIcon: String {
         switch download.phase {
-        case .completed: "play.circle.fill"
-        case .downloading, .resolving, .queued: "pause.circle.fill"
-        case .paused, .failed: "arrow.down.circle.fill"
+        case .completed: return "play.circle.fill"
+        case .downloading, .resolving, .queued: return "pause.circle.fill"
+        case .paused, .failed: return "arrow.down.circle.fill"
         }
     }
 }
