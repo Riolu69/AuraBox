@@ -1,6 +1,6 @@
 //
 //  TVSearchView.swift
-//  SceneBox
+//  MovieStream
 //
 //  Created by SpontaneousArray on 01.08.26.
 //
@@ -8,7 +8,21 @@
 #if os(tvOS)
 import SwiftUI
 
+// MARK: - Встроенный переводчик
+fileprivate func tr(_ key: String, _ lang: String) -> String {
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "Search": "Поиск",
+        "Search movies, shows & anime": "Искать фильмы, сериалы и аниме",
+        "Find any movie, show, or anime by name.": "Найдите любой фильм, сериал или аниме по названию.",
+        "No results": "Нет результатов",
+        "Nothing matched your search.": "По вашему запросу ничего не найдено."
+    ]
+    return dict[key] ?? key
+}
+
 struct TVSearchView: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     @State private var model = SearchModel()
     @Environment(AppSettings.self) private var settings
     @FocusState private var fieldFocused: Bool
@@ -19,7 +33,7 @@ struct TVSearchView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 36) {
-                    PageTitleRow("Search")
+                    PageTitleRow(tr("Search", appLanguage))
                     searchField
                     content
                 }
@@ -28,7 +42,7 @@ struct TVSearchView: View {
                 .padding(.bottom, 60)
             }
             .background(Theme.background.ignoresSafeArea())
-            .pageTitle("Search")
+            .pageTitle(tr("Search", appLanguage))
             .mediaNavigationDestinations()
             .defaultFocus($fieldFocused, true)
         }
@@ -47,7 +61,7 @@ struct TVSearchView: View {
             Image(systemName: "magnifyingglass")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(fieldFocused ? Color.black.opacity(0.7) : .white.opacity(0.6))
-            TextField("Search movies, shows & anime", text: $model.query)
+            TextField(tr("Search movies, shows & anime", appLanguage), text: $model.query)
                 .textFieldStyle(.plain)
                 .font(.title3)
                 .foregroundStyle(fieldFocused ? Color.black : .white)
@@ -75,14 +89,14 @@ struct TVSearchView: View {
         } else if !model.isSearching {
             centered {
                 EmptyStateView(systemImage: "magnifyingglass",
-                               title: "Search",
-                               message: "Find any movie, show, or anime by name.")
+                               title: tr("Search", appLanguage),
+                               message: tr("Find any movie, show, or anime by name.", appLanguage))
             }
         } else if model.results.isEmpty {
             centered {
                 EmptyStateView(systemImage: "magnifyingglass",
-                               title: "No results",
-                               message: model.errorMessage ?? "Nothing matched your search.")
+                               title: tr("No results", appLanguage),
+                               message: model.errorMessage ?? tr("Nothing matched your search.", appLanguage))
             }
         } else {
             LazyVGrid(columns: columns, spacing: 56) {
