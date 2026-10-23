@@ -2,21 +2,36 @@
 //  RootTabView.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 19.08.26.
-//
 
 import SwiftUI
 
 enum AppTab: String, Hashable {
     case home, search, library, profile
 
-    /// `-SBInitialTab library` (screenshots and debugging) picks the first tab.
     static var initial: AppTab {
         UserDefaults.standard.string(forKey: "SBInitialTab").flatMap(AppTab.init(rawValue:)) ?? .home
     }
 }
 
+// MARK: - Мини-переводчик (Словарь)
+enum L {
+    static func text(_ key: String, lang: String) -> String {
+        let ruDict: [String: String] = [
+            "Home": "Главная",
+            "Search": "Поиск",
+            "Library": "Медиатека",
+            "Profile": "Профиль",
+            "Done": "Готово"
+        ]
+        // Если выбран русский — берем из словаря. Иначе — оставляем английский.
+        return lang == "ru" ? (ruDict[key] ?? key) : key
+    }
+}
+
 struct RootTabView: View {
+    // Эта переменная хранит язык и заставляет экран обновиться при переключении
+    @AppStorage("appLanguage") private var appLanguage = "ru" 
+    
     @State private var router = TabRouter.shared
     @State private var settings = AppSettings.shared
     @State private var downloads = DownloadStore.shared
@@ -33,22 +48,22 @@ struct RootTabView: View {
     var body: some View {
         TabView(selection: $router.tab) {
             #if os(tvOS)
-            Tab("Home", systemImage: "house.fill", value: AppTab.home) {
+            Tab(LocalizedStringKey(L.text("Home", lang: appLanguage)), systemImage: "house.fill", value: AppTab.home) {
                 TVHomeView()
             }
-            Tab("Search", systemImage: "magnifyingglass", value: AppTab.search) {
+            Tab(LocalizedStringKey(L.text("Search", lang: appLanguage)), systemImage: "magnifyingglass", value: AppTab.search) {
                 TVSearchView()
             }
             #else
-            Tab("Home", systemImage: "house.fill", value: AppTab.home) {
+            Tab(LocalizedStringKey(L.text("Home", lang: appLanguage)), systemImage: "house.fill", value: AppTab.home) {
                 HomeView()
             }
-            Tab("Search", systemImage: "magnifyingglass", value: AppTab.search) {
+            Tab(LocalizedStringKey(L.text("Search", lang: appLanguage)), systemImage: "magnifyingglass", value: AppTab.search) {
                 SearchView()
             }
             #endif
 
-            Tab("Library", systemImage: "books.vertical", value: AppTab.library) {
+            Tab(LocalizedStringKey(L.text("Library", lang: appLanguage)), systemImage: "books.vertical", value: AppTab.library) {
                 LibraryView()
             }
             #if !os(tvOS)
@@ -56,7 +71,7 @@ struct RootTabView: View {
             #endif
 
             #if os(tvOS)
-            Tab("Profile", systemImage: "person.crop.circle", value: AppTab.profile) {
+            Tab(LocalizedStringKey(L.text("Profile", lang: appLanguage)), systemImage: "person.crop.circle", value: AppTab.profile) {
                 ProfileView()
             }
             #else
@@ -64,7 +79,7 @@ struct RootTabView: View {
                 ProfileView()
             } label: {
                 Label {
-                    Text("Profile")
+                    Text(L.text("Profile", lang: appLanguage))
                 } icon: {
                     if let profileIcon {
                         Image(uiImage: profileIcon).renderingMode(.original)
@@ -99,7 +114,7 @@ struct RootTabView: View {
                     .mediaNavigationDestinations()
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { detailItem = nil }
+                            Button(L.text("Done", lang: appLanguage)) { detailItem = nil }
                         }
                     }
             }
