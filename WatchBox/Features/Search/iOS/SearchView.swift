@@ -1,12 +1,54 @@
 //
 //  SearchView.swift
-//  SceneBox
-//
-//  Created by SpontaneousArray on 19.08.26.
+//  MovieStream
 //
 
 #if os(iOS)
 import SwiftUI
+
+// MARK: - Встроенный переводчик
+fileprivate func tr(_ key: String, _ lang: String) -> String {
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "Search": "Поиск",
+        "Movies, shows and anime": "Фильмы, сериалы и аниме",
+        "Clear search": "Очистить поиск",
+        "Search movies, shows & anime": "Искать фильмы, сериалы и аниме",
+        "Reset Filters": "Сбросить фильтры",
+        "Type": "Тип",
+        "Feed": "Подборка",
+        "Genre": "Жанр",
+        "All Genres": "Все жанры",
+        "Filters": "Фильтры",
+        "Loading": "Загрузка",
+        "Nothing found": "Ничего не найдено",
+        "Check the spelling, or try the original title.": "Проверьте написание или попробуйте оригинальное название.",
+        "Search by name, or browse by type, feed and genre.": "Ищите по названию или фильтруйте по типу, подборке и жанру.",
+        
+        // Категории и фиды (если они приходят из других файлов)
+        "Movie": "Фильмы",
+        "Movies": "Фильмы",
+        "Series": "Сериалы",
+        "TV Show": "Сериалы",
+        "TV Shows": "Сериалы",
+        "Anime": "Аниме",
+        "Popular": "Популярное",
+        "Top": "Топ",
+        "New": "Новинки"
+    ]
+    
+    // Пытаемся перевести и некоторые популярные жанры, если они совпадают
+    let genres: [String: String] = [
+        "Action": "Боевик", "Adventure": "Приключения", "Animation": "Анимация",
+        "Comedy": "Комедия", "Crime": "Криминал", "Documentary": "Документальный",
+        "Drama": "Драма", "Family": "Семейный", "Fantasy": "Фэнтези",
+        "History": "История", "Horror": "Ужасы", "Music": "Музыка",
+        "Mystery": "Детектив", "Romance": "Мелодрама", "Science Fiction": "Фантастика",
+        "Sci-Fi": "Фантастика", "Thriller": "Триллер", "War": "Военный", "Western": "Вестерн"
+    ]
+    
+    return dict[key] ?? genres[key] ?? key
+}
 
 struct SearchView: View {
     var body: some View {
@@ -21,6 +63,7 @@ struct SearchView: View {
 }
 
 struct SearchScreen: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     @State private var model = SearchModel()
     @State private var router = TabRouter.shared
     @Environment(AppSettings.self) private var settings
@@ -52,7 +95,7 @@ struct SearchScreen: View {
 
     private var phoneHeader: some View {
         VStack(spacing: 10) {
-            RootHeader(title: "Search") {
+            RootHeader(title: tr("Search", appLanguage)) {
                 if !model.isSearching {
                     filterMenu
                         .labelStyle(.iconOnly)
@@ -65,7 +108,7 @@ struct SearchScreen: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Theme.textSecondary)
-                TextField("Movies, shows and anime", text: $model.query)
+                TextField(tr("Movies, shows and anime", appLanguage), text: $model.query)
                     .textFieldStyle(.plain)
                     .focused($macFieldFocused)
                     .submitLabel(.search)
@@ -82,7 +125,7 @@ struct SearchScreen: View {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.textSecondary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
+                    .accessibilityLabel(tr("Clear search", appLanguage))
                 }
             }
             .padding(.horizontal, 14)
@@ -114,7 +157,7 @@ struct SearchScreen: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search movies, shows & anime", text: $model.query)
+                TextField(tr("Search movies, shows & anime", appLanguage), text: $model.query)
                     .textFieldStyle(.plain)
                     .focused($macFieldFocused)
                     .onSubmit { model.run(immediate: true) }
@@ -146,28 +189,28 @@ struct SearchScreen: View {
         Menu {
             if filtersActive {
                 Button { resetFilters() } label: {
-                    Label("Reset Filters", systemImage: "arrow.counterclockwise")
+                    Label(tr("Reset Filters", appLanguage), systemImage: "arrow.counterclockwise")
                 }
             }
 
-            Picker("Type", selection: $model.scope) {
+            Picker(tr("Type", appLanguage), selection: $model.scope) {
                 ForEach(SearchModel.Scope.browseScopes) { scope in
-                    Text(scope.title).tag(scope)
+                    Text(tr(scope.title, appLanguage)).tag(scope)
                 }
             }
-            Picker("Feed", selection: $model.feed) {
+            Picker(tr("Feed", appLanguage), selection: $model.feed) {
                 ForEach(CatalogFeed.allCases) { feed in
-                    Text(feed.title).tag(feed)
+                    Text(tr(feed.title, appLanguage)).tag(feed)
                 }
             }
-            Picker("Genre", selection: $model.genre) {
-                Text("All Genres").tag(String?.none)
+            Picker(tr("Genre", appLanguage), selection: $model.genre) {
+                Text(tr("All Genres", appLanguage)).tag(String?.none)
                 ForEach(MediaGenre.shared, id: \.self) { genre in
-                    Text(genre).tag(String?.some(genre))
+                    Text(tr(genre, appLanguage)).tag(String?.some(genre))
                 }
             }
         } label: {
-            Label("Filters", systemImage: filtersActive
+            Label(tr("Filters", appLanguage), systemImage: filtersActive
                   ? "line.3.horizontal.decrease.circle.fill"
                   : "line.3.horizontal.decrease.circle")
         }
@@ -189,6 +232,7 @@ struct SearchScreen: View {
 }
 
 struct SearchResults: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let model: SearchModel
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -198,10 +242,10 @@ struct SearchResults: View {
             placeholderGrid
         } else if model.results.isEmpty {
             EmptyStateView(systemImage: "magnifyingglass",
-                           title: model.isSearching ? "Nothing found" : "Search",
+                           title: model.isSearching ? tr("Nothing found", appLanguage) : tr("Search", appLanguage),
                            message: model.errorMessage ?? (model.isSearching
-                               ? "Check the spelling, or try the original title."
-                               : "Search by name, or browse by type, feed and genre."))
+                               ? tr("Check the spelling, or try the original title.", appLanguage)
+                               : tr("Search by name, or browse by type, feed and genre.", appLanguage)))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             grid
@@ -221,7 +265,7 @@ struct SearchResults: View {
             .padding(.horizontal, 16)
         }
         .scrollDisabled(true)
-        .accessibilityLabel("Loading")
+        .accessibilityLabel(tr("Loading", appLanguage))
     }
 
     private var grid: some View {
