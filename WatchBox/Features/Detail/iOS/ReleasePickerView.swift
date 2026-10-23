@@ -1,13 +1,40 @@
 //
 //  ReleasePickerView.swift
-//  SceneBox
-//
-//  Created by SpontaneousArray on 31.07.26.
+//  Moviestream
 //
 
 import SwiftUI
 
+// MARK: - Встроенный переводчик
+fileprivate func tr(_ key: String, _ lang: String) -> String {
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "Watch": "Смотреть",
+        "Download": "Скачать",
+        "Sources": "Источники",
+        "No sources": "Нет источников",
+        "Cancel": "Отмена",
+        "No seeders right now, likely won't start": "Нет сидов, скорее всего не запустится",
+        "Best pick": "Лучший выбор",
+        "Last watched": "Вы смотрели",
+        "Didn't start": "Не запустилось",
+        "Subtitles saved": "Субтитры сохранены",
+        "Debrid": "Debrid",
+        "May buffer": "Может тормозить",
+        "No seeders": "Нет сидов"
+    ]
+    
+    // Обработка динамических строк с сидами
+    if key.hasSuffix(" seeding") {
+        let number = key.replacingOccurrences(of: " seeding", with: "")
+        return "\(number) сидов"
+    }
+    
+    return dict[key] ?? key
+}
+
 struct ReleasePickerView: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let model: MediaDetailModel
     let request: MediaDetailModel.ReleaseRequest
     let onSelect: (TorrentStream) -> Void
@@ -23,13 +50,30 @@ struct ReleasePickerView: View {
     }
 
     private var orderedReleases: [TorrentStream] {
-        guard let key = lastWatchedKey,
-              let index = model.releases.firstIndex(where: { SourceKey.make($0) == key }),
-              model.assessments[model.releases[index].id]?.health != .dead else {
-            return model.releases       // a source gone dead stays down with the others
-        }
         var list = model.releases
-        list.insert(list.remove(at: index), at: 0)
+        
+        // 1. Умная сортировка: отделяем русские релизы от остальных
+        let rusKeywords = ["RUS", "DUB", "MVO", "RUTOR", "RUTRACKER", "LINE", "DUAL", "ПРОФ", "ЛЮБИТЕЛЬСКИЙ"]
+        
+        let rusReleases = list.filter { r in
+            let upperName = r.displayName.uppercased()
+            return rusKeywords.contains(where: { upperName.contains($0) })
+        }
+        let otherReleases = list.filter { r in
+            let upperName = r.displayName.uppercased()
+            return !rusKeywords.contains(where: { upperName.contains($0) })
+        }
+        
+        // Склеиваем: сначала русские (сохраняя их внутреннюю сортировку), затем остальные
+        list = rusReleases + otherReleases
+
+        // 2. Поднимаем последний просмотренный источник в самый верх (если он жив)
+        if let key = lastWatchedKey,
+           let index = list.firstIndex(where: { SourceKey.make($0) == key }),
+           model.assessments[list[index].id]?.health != .dead {
+            list.insert(list.remove(at: index), at: 0)
+        }
+        
         return list
     }
 
@@ -48,11 +92,11 @@ struct ReleasePickerView: View {
     }
 
     private var navigationTitle: String {
-        let action = request.intent == .watch ? "Watch" : "Download"
+        let action = request.intent == .watch ? tr("Watch", appLanguage) : tr("Download", appLanguage)
         if let episode = request.episode {
             return "\(action) · \(episode.label)"
         }
-        return "\(action) · Sources"
+        return "\(action) · \(tr("Sources", appLanguage))"
     }
 
     #if os(tvOS)
@@ -71,7 +115,7 @@ struct ReleasePickerView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let error = model.releaseError {
                     EmptyStateView(systemImage: "magnifyingglass",
-                                   title: "No sources", message: error)
+                                   title: tr("No sources", appLanguage), message: error)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
@@ -92,7 +136,7 @@ struct ReleasePickerView: View {
                                         assessment: assessment,
                                         isBestPick: stream.id == bestPickID,
                                         isDownloaded: downloads.contains(infoHash: stream.id,
-                                                                   episodeLabel: request.episode?.label),
+                                                                         episodeLabel: request.episode?.label),
                                         isLastWatched: isLast,
                                         hasSavedSubtitles: withSubtitles.contains(SourceKey.make(stream)))
                                         #if os(iOS)
@@ -128,7 +172,7 @@ struct ReleasePickerView: View {
             .inlineNavigationBar()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(tr("Cancel", appLanguage)) { dismiss() }
                 }
             }
         }
@@ -141,10 +185,12 @@ struct ReleasePickerView: View {
 
 /// Divides off the sources nobody is sharing right now.
 private struct DeadSourcesHeader: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+    
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "person.2.slash")
-            Text("No seeders right now, likely won't start")
+            Text(tr("No seeders right now, likely won't start", appLanguage))
             Spacer(minLength: 0)
         }
         .font(.caption.weight(.semibold))
@@ -156,6 +202,8 @@ private struct DeadSourcesHeader: View {
 }
 
 private struct ReleaseRow: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+    
     let stream: TorrentStream
     var assessment: SourceRanking.Assessment? = nil
     var isBestPick = false
@@ -163,6 +211,21 @@ private struct ReleaseRow: View {
     var isLastWatched = false
     var hasSavedSubtitles = false
     @Environment(\.isFocused) private var isFocused
+    
+    // Умные теги для визуализации качества перевода и трекера
+    private var customTags: [(text: String, color: Color)] {
+        var tags: [(String, Color)] = []
+        let upper = stream.displayName.uppercased()
+
+        if upper.contains("DUB") || upper.contains("ДУБЛЯЖ") { tags.append(("DUB", .green)) }
+        else if upper.contains("MVO") || upper.contains("ПРОФ") { tags.append(("MVO", .blue)) }
+        else if upper.contains("L1") || upper.contains("LINE") { tags.append(("LINE", .orange)) }
+        
+        if upper.contains("RUS") || upper.contains("РУС") { tags.append(("RUS", .red)) }
+        if upper.contains("RUTOR") || upper.contains("RUTRACKER") { tags.append(("RU-TRACKER", .purple)) }
+        
+        return tags
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -184,20 +247,26 @@ private struct ReleaseRow: View {
 
             FlowLayout(spacing: 8) {
                 if isBestPick {
-                    Chip(text: "Best pick", systemImage: "sparkles", tint: Theme.accent)
+                    Chip(text: tr("Best pick", appLanguage), systemImage: "sparkles", tint: Theme.accent)
                 }
                 if isLastWatched {
-                    Chip(text: "Last watched", systemImage: "clock.arrow.circlepath", tint: Theme.accent)
+                    Chip(text: tr("Last watched", appLanguage), systemImage: "clock.arrow.circlepath", tint: Theme.accent)
                 }
                 if assessment?.failedBefore == true {
-                    Chip(text: "Didn't start", systemImage: "exclamationmark.triangle.fill", tint: .red)
+                    Chip(text: tr("Didn't start", appLanguage), systemImage: "exclamationmark.triangle.fill", tint: .red)
                 }
                 if hasSavedSubtitles {
-                    Chip(text: "Subtitles saved", systemImage: "captions.bubble.fill")
+                    Chip(text: tr("Subtitles saved", appLanguage), systemImage: "captions.bubble.fill")
                 }
                 if stream.isDebrid {
-                    Chip(text: "Debrid", systemImage: "bolt.fill", tint: .green)
+                    Chip(text: tr("Debrid", appLanguage), systemImage: "bolt.fill", tint: .green)
                 }
+                
+                // Вставка наших цветных тегов
+                ForEach(customTags, id: \.text) { tag in
+                    Chip(text: tag.text, tint: tag.color)
+                }
+                
                 if let resolution = stream.resolution {
                     Chip(text: resolution.uppercased())
                 }
@@ -206,7 +275,7 @@ private struct ReleaseRow: View {
                 }
                 seedersChip
                 if assessment?.isHeavy == true {
-                    Chip(text: "May buffer", systemImage: "tortoise.fill", tint: .orange)
+                    Chip(text: tr("May buffer", appLanguage), systemImage: "tortoise.fill", tint: .orange)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -223,13 +292,13 @@ private struct ReleaseRow: View {
         if let assessment, assessment.isLive, let seeders = assessment.seeders {
             switch assessment.health {
             case .dead:
-                Chip(text: "No seeders", systemImage: "person.2.slash", tint: .red)
+                Chip(text: tr("No seeders", appLanguage), systemImage: "person.2.slash", tint: .red)
             case .strong:
-                Chip(text: "\(seeders) seeding", systemImage: "dot.radiowaves.left.and.right", tint: .green)
+                Chip(text: tr("\(seeders) seeding", appLanguage), systemImage: "dot.radiowaves.left.and.right", tint: .green)
             case .fair:
-                Chip(text: "\(seeders) seeding", systemImage: "dot.radiowaves.left.and.right", tint: .yellow)
+                Chip(text: tr("\(seeders) seeding", appLanguage), systemImage: "dot.radiowaves.left.and.right", tint: .yellow)
             default:
-                Chip(text: "\(seeders) seeding", systemImage: "dot.radiowaves.left.and.right", tint: .orange)
+                Chip(text: tr("\(seeders) seeding", appLanguage), systemImage: "dot.radiowaves.left.and.right", tint: .orange)
             }
         } else if let seeders = stream.seeders {
             Chip(text: "\(seeders)", systemImage: "person.2.fill",
