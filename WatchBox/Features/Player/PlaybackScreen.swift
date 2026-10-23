@@ -1,8 +1,6 @@
 //
 //  PlaybackScreen.swift
-//  SceneBox
-//
-//  Created by SpontaneousArray on 19.08.26.
+//  MovieStream
 //
 
 import SwiftUI
@@ -17,7 +15,20 @@ import OSLog
 private let playbackLog = Logger(subsystem: "WatchBox", category: "playback")
 #endif
 
+// MARK: - Встроенный переводчик
+fileprivate func tr(_ key: String, _ lang: String) -> String {
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "Playback failed. The release may be corrupt or use an unsupported container.": "Ошибка воспроизведения. Файл поврежден или формат не поддерживается.",
+        "The stream stopped and couldn't restart. Close the player and open the episode again; it will continue from here.": "Поток прервался. Закройте плеер и запустите видео заново, оно продолжится с этого же места.",
+        "Close": "Закрыть"
+    ]
+    return dict[key] ?? key
+}
+
 struct PlaybackScreen: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+    
     let url: URL
     let title: String
     let stats: SwarmStats?
@@ -210,7 +221,6 @@ struct PlaybackScreen: View {
         .animation(.easeInOut(duration: 0.35), value: upNextRemaining != nil)
         .animation(.easeInOut(duration: 0.25), value: cast.isActive)
         .onChange(of: cast.computerPlays) { _, _ in
-            // A computer is playing it from the page: one player at a time.
             if player.isPlaying { player.pause() }
         }
         #if os(iOS)
@@ -295,7 +305,6 @@ struct PlaybackScreen: View {
             try? player.seek(to: startAt)
         }
         .onChange(of: scenePhase) { _, phase in
-            // Save the spot before iOS may suspend the app.
             if phase == .background { recordProgress() }
         }
         .onAppear(perform: start)
@@ -325,9 +334,6 @@ struct PlaybackScreen: View {
         }
         .onChange(of: player.didReachEnd) { _, ended in
             guard ended, !cast.isActive else { return }
-            // VLC reports "ended" whenever the stream closes. Mid-episode that
-            // means the stream broke (e.g. after the phone was locked): pick
-            // up where it stopped, never mark it watched or skip ahead.
             if endedEarly { recoverStream() } else { playbackEnded() }
         }
         .onChange(of: isBuffering) { wasBuffering, buffering in
@@ -346,13 +352,11 @@ struct PlaybackScreen: View {
                 player.stop()
                 openRetries += 1
             } else {
-                failure = "Playback failed. The release may be corrupt or use an unsupported container."
+                failure = tr("Playback failed. The release may be corrupt or use an unsupported container.", appLanguage)
             }
         }
         .onDisappear(perform: teardown)
         #if canImport(Translation) && os(iOS)
-        // Only for the first-time language download prompt; translating runs
-        // app-wide (TranslationCenter) so it survives closing the player.
         .translationTask(subs.prepareConfiguration) { session in
             await subs.prepareLanguage(session)
         }
@@ -361,18 +365,15 @@ struct PlaybackScreen: View {
 
     private var sourceURL: URL { sourceOverride ?? url }
 
-    /// "Ended" well before the credits: the stream broke off.
     private var endedEarly: Bool {
         knownDuration > .zero && lastGoodPosition > .zero
             && lastGoodPosition < knownDuration - .seconds(20)
     }
 
-    /// Reopens the video where it stopped: from the file itself when it's all
-    /// on the phone, else from the stream once it answers again.
     private func recoverStream() {
         guard !isRecovering, failure == nil, !cast.isActive else { return }
         guard recoveries < 5 else {
-            failure = "The stream stopped and couldn't restart. Close the player and open the episode again; it will continue from here."
+            failure = tr("The stream stopped and couldn't restart. Close the player and open the episode again; it will continue from here.", appLanguage)
             return
         }
         recoveries += 1
@@ -422,7 +423,6 @@ struct PlaybackScreen: View {
                 lastSeen = player.currentTime
             }
             if recoverySeek == nil, !isRecovering, player.currentTime > .zero {
-                // A minute of good playback after a recovery clears the count.
                 if let at = recoveredAt, player.currentTime > at + .seconds(60) {
                     recoveries = 0
                     recoveredAt = nil
@@ -445,11 +445,8 @@ struct PlaybackScreen: View {
     private var upNextRaisedInset: CGFloat { 120 }
     #endif
 
-    /// Auto-play follows after this many seconds of the prompt filling up.
     private static let autoplaySeconds = 10.0
 
-    /// When the prompt appears: the last 90 s on iPhone and iPad (credits),
-    /// shorter for short episodes; the last 10 s on Apple TV.
     private var upNextWindow: Double {
         #if os(tvOS)
         return Self.autoplaySeconds
@@ -470,7 +467,6 @@ struct PlaybackScreen: View {
                 continue
             }
             let remaining = (knownDuration - player.currentTime).asSeconds
-            // Rewound well before the credits: a dismissed prompt may come back.
             if upNextCancelled, remaining > upNextWindow + 60 { upNextCancelled = false }
             guard !upNextCancelled, remaining > 0, remaining <= upNextWindow else {
                 upNextRemaining = nil
@@ -485,7 +481,6 @@ struct PlaybackScreen: View {
         upNextRemaining = nil
     }
 
-    /// "Next Episode" during the credits: this one counts as watched.
     private func playNextNow() {
         guard !didAutoAdvance, let episodes, let next = episodes.next else { return }
         didAutoAdvance = true
@@ -526,7 +521,7 @@ struct PlaybackScreen: View {
         guard !originalAudioSatisfied, let code = targetAudioLanguage else { return }
         var seen = Set<String>()
         let tracks = player.audioTracks.filter { seen.insert($0.id).inserted }
-        guard tracks.count > 1 else { return }   // more may still be discovered
+        guard tracks.count > 1 else { return }
 
         if let selected = player.selectedAudioTrack,
            OriginalAudio.matches(selected, language: code) {
@@ -599,8 +594,6 @@ struct PlaybackScreen: View {
         player.aspectRatio = settings.fillScreen ? .fill : .default
         player.setSubtitleScale(SubtitleScale(Float(settings.subtitleScale)))
         #if os(iOS)
-        // Video opens the way it's watched. The rotate button still returns to
-        // portrait, and iPads keep whichever way they're held.
         if UIDevice.current.userInterfaceIdiom == .phone, !Platform.isMac {
             isLandscape = true
             ScreenOrientation.landscape()
@@ -634,15 +627,12 @@ struct PlaybackScreen: View {
             let media = try Media(url: url)
             if !url.isFileURL {
                 let isTorrent = url.host == "127.0.0.1"
-                // The local torrent server already holds data ahead of the playhead,
-                // so a very deep player cache only delays the first frame.
                 let cacheMs = isTorrent
                     ? max(settings.networkCacheMilliseconds, 5000)
                     : settings.networkCacheMilliseconds
                 media.addOption(":network-caching=\(cacheMs)")
 
-                if isTorrent {
-                } else {
+                if !isTorrent {
                     media.addOption(":http-reconnect")
                 }
             }
@@ -695,7 +685,6 @@ struct PlaybackScreen: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled else { return }
-            // While casting the phone's player sits paused; the TV's position counts.
             if player.isPlaying || cast.phase == .playing { recordProgress() }
         }
     }
@@ -714,8 +703,6 @@ struct PlaybackScreen: View {
 
     // MARK: - Casting
 
-    /// Opens the screen picker, serving the video on the Wi-Fi meanwhile so
-    /// a computer can open it too.
     private func openCastPicker() {
         showCastPicker = true
         let media = CastSession.Media(source: sourceURL, title: title,
@@ -724,8 +711,6 @@ struct PlaybackScreen: View {
         Task { await cast.prepare(media, subtitleFile: subtitleFile) }
     }
 
-    /// The phone's player stops (so the TV gets the whole stream) and the TV
-    /// takes over from the same spot.
     private func startCasting(on device: RendererDescription) {
         let from = player.currentTime > .zero ? player.currentTime : lastGoodPosition
         lastGoodPosition = from
@@ -740,7 +725,6 @@ struct PlaybackScreen: View {
         }
     }
 
-    /// Back to the phone, where the TV got to.
     private func stopCasting() {
         Task {
             let reached = await cast.stop()
@@ -785,6 +769,7 @@ private struct InvisibleButtonStyle: ButtonStyle {
 #endif
 
 private struct FailureOverlay: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let message: String
     let onClose: () -> Void
 
@@ -796,7 +781,7 @@ private struct FailureOverlay: View {
             Text(message)
                 .multilineTextAlignment(.center)
                 .font(.callout)
-            Button("Close", action: onClose)
+            Button(tr("Close", appLanguage), action: onClose)
                 .buttonStyle(.borderedProminent)
         }
         .foregroundStyle(.white)
