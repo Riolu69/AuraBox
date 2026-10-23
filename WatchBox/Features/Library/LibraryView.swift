@@ -2,12 +2,34 @@
 //  LibraryView.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 08.08.26.
-//
 
 import SwiftUI
 
+// MARK: - Встроенный переводчик
+fileprivate func tr(_ key: String, _ lang: String) -> String {
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "Library": "Медиатека",
+        "Downloads": "Загрузки",
+        "Watchlist": "Избранное", // или "Буду смотреть"
+        "Section": "Раздел",
+        "No saved titles": "Нет сохраненных видео",
+        "Add movies and shows to your Watchlist from their detail pages.": "Добавляйте фильмы и сериалы в Избранное со страниц описания.",
+        "Remove": "Удалить",
+        "Remove from Watchlist": "Удалить из Избранного",
+        "Movie": "Фильм",
+        "TV Show": "Сериал",
+        "Anime": "Аниме",
+        "watched": "просмотрено",
+        "episode watched": "эпизод просмотрен",
+        "episodes watched": "эпизодов просмотрено"
+    ]
+    return dict[key] ?? key
+}
+
 struct LibraryView: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+
     private enum Section: String, CaseIterable, Identifiable {
         case downloads = "Downloads"
         case watchlist = "Watchlist"
@@ -23,7 +45,7 @@ struct LibraryView: View {
                 #if os(tvOS)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 28) {
-                        PageTitleRow("Library")
+                        PageTitleRow(tr("Library", appLanguage))
                         sectionPicker
                         content
                     }
@@ -33,7 +55,7 @@ struct LibraryView: View {
                 }
                 #else
                 VStack(spacing: 0) {
-                    RootHeader("Library")
+                    RootHeader(tr("Library", appLanguage))
                     sectionPicker
                         .padding(.horizontal, controlInset)
                         .padding(.top, 10)
@@ -45,7 +67,7 @@ struct LibraryView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.background)
             #if os(tvOS)
-            .pageTitle("Library")
+            .pageTitle(tr("Library", appLanguage))
             #else
             .toolbar(.hidden, for: .navigationBar)
             .statusBarScrim()
@@ -57,8 +79,8 @@ struct LibraryView: View {
     @ViewBuilder
     private var sectionPicker: some View {
         #if os(tvOS)
-        Picker("Section", selection: $section) {
-            ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
+        Picker(tr("Section", appLanguage), selection: $section) {
+            ForEach(Section.allCases) { Text(tr($0.rawValue, appLanguage)).tag($0) }
         }
         .pickerStyle(.segmented)
         #else
@@ -69,7 +91,7 @@ struct LibraryView: View {
                 Button {
                     withAnimation(Theme.snappy) { section = option }
                 } label: {
-                    Text(option.rawValue)
+                    Text(tr(option.rawValue, appLanguage))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(selected ? Theme.onAccent : Theme.textSecondary)
                         .frame(maxWidth: .infinity)
@@ -110,14 +132,15 @@ struct LibraryView: View {
 }
 
 private struct WatchlistSection: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     @Environment(WatchlistStore.self) private var watchlist
 
     var body: some View {
         if watchlist.items.isEmpty {
             EmptyStateView(
                 systemImage: "bookmark",
-                title: "No saved titles",
-                message: "Add movies and shows to your Watchlist from their detail pages.")
+                title: tr("No saved titles", appLanguage),
+                message: tr("Add movies and shows to your Watchlist from their detail pages.", appLanguage))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #if os(tvOS)
                 .frame(minHeight: 500)   // hosted in a ScrollView: give it room
@@ -134,7 +157,7 @@ private struct WatchlistSection: View {
                         Button(role: .destructive) {
                             watchlist.remove(id: item.id)
                         } label: {
-                            Label("Remove from Watchlist", systemImage: "bookmark.slash")
+                            Label(tr("Remove from Watchlist", appLanguage), systemImage: "bookmark.slash")
                         }
                     }
                 }
@@ -151,14 +174,14 @@ private struct WatchlistSection: View {
                         Button(role: .destructive) {
                             watchlist.remove(id: item.id)
                         } label: {
-                            Label("Remove", systemImage: "bookmark.slash")
+                            Label(tr("Remove", appLanguage), systemImage: "bookmark.slash")
                         }
                     }
                     .contextMenu {
                         Button(role: .destructive) {
                             watchlist.remove(id: item.id)
                         } label: {
-                            Label("Remove from Watchlist", systemImage: "bookmark.slash")
+                            Label(tr("Remove from Watchlist", appLanguage), systemImage: "bookmark.slash")
                         }
                     }
                 }
@@ -172,6 +195,7 @@ private struct WatchlistSection: View {
 }
 
 private struct WatchlistRow: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
     let item: WatchlistItem
     @Environment(WatchProgressStore.self) private var progress
     #if os(tvOS)
@@ -219,10 +243,11 @@ private struct WatchlistRow: View {
 
     /// Type plus where the viewer is: "Movie, watched", "TV Show, 3 episodes watched".
     private var statusLine: String {
-        if isWatchedMovie { return "\(typeLabel), watched" }
+        if isWatchedMovie { return "\(typeLabel), \(tr("watched", appLanguage))" }
         let watched = progress.watchedEpisodes(for: item.id).count
         if item.mediaType != .movie, watched > 0 {
-            return "\(typeLabel), \(watched) episode\(watched == 1 ? "" : "s") watched"
+            let epStr = watched == 1 ? tr("episode watched", appLanguage) : tr("episodes watched", appLanguage)
+            return "\(typeLabel), \(watched) \(epStr)"
         }
         if let label = saved?.episodeLabel, inProgressFraction != nil { return "\(typeLabel), \(label)" }
         return typeLabel
@@ -230,9 +255,9 @@ private struct WatchlistRow: View {
 
     private var typeLabel: String {
         switch item.mediaType {
-        case .movie: "Movie"
-        case .series: "TV Show"
-        case .anime: "Anime"
+        case .movie: return tr("Movie", appLanguage)
+        case .series: return tr("TV Show", appLanguage)
+        case .anime: return tr("Anime", appLanguage)
         }
     }
 
