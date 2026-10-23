@@ -77,7 +77,9 @@ fileprivate func tr(_ key: String, _ lang: String) -> String {
         "Delete all downloads?": "Удалить все загрузки?",
         "Clear cache?": "Очистить кэш?",
         "None": "Нет",
-        " hidden": " скрыто"
+        " hidden": " скрыто",
+        "Smart (recommended)": "Умная (рекомендуется)",
+        "Always-on audio": "Постоянное аудио"
     ]
     return dict[key] ?? key
 }
@@ -316,7 +318,7 @@ struct ProfileView: View {
                     #if os(iOS)
                     Picker(tr("Keep downloading in background", appLanguage), selection: $settings.backgroundDownloadMode) {
                         ForEach(BackgroundDownloadMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
+                            Text(tr(mode.title, appLanguage)).tag(mode)
                         }
                     }
                     if #available(iOS 26, *) {
