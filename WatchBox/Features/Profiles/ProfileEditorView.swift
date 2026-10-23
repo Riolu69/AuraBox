@@ -2,15 +2,38 @@
 //  ProfileEditorView.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 21.08.26.
-//
 
 import SwiftUI
 #if canImport(PhotosUI) && !os(tvOS)
 import PhotosUI
 #endif
 
+// MARK: - Встроенный переводчик
+fileprivate func tr(_ key: String, _ lang: String) -> String {
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "Cancel": "Отмена",
+        "Delete this profile?": "Удалить этот профиль?",
+        "Delete profile": "Удалить профиль",
+        "Its watch history and watchlist will be removed. This can't be undone.": "История просмотров и избранное будут удалены. Это действие необратимо.",
+        "Create your profile": "Создайте свой профиль",
+        "Add profile": "Добавить профиль",
+        "Edit profile": "Редактировать профиль",
+        "Everyone gets their own watch history and list.": "У каждого будет своя история просмотров и избранное.",
+        "Name": "Имя",
+        "Create": "Создать",
+        "Save": "Сохранить",
+        "Change photo": "Изменить фото",
+        "Choose photo": "Выбрать фото",
+        "Remove": "Удалить",
+        "Add a photo from the iPhone, iPad or Mac app.": "Добавьте фото в приложении на iPhone, iPad или Mac."
+    ]
+    return dict[key] ?? key
+}
+
 struct ProfileEditorView: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+    
     enum Mode: Identifiable, Hashable {
         case create(first: Bool)
         case edit(Profile)
@@ -72,7 +95,7 @@ struct ProfileEditorView: View {
                         .toolbar {
                             #if !os(tvOS)
                             ToolbarItem(placement: .cancellationAction) {
-                                Button("Cancel") { dismiss() }
+                                Button(tr("Cancel", appLanguage)) { dismiss() }
                             }
                             #endif
                         }
@@ -87,8 +110,8 @@ struct ProfileEditorView: View {
                 colorIndex = existing.colorIndex
             }
         }
-        .confirmationDialog("Delete this profile?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete profile", role: .destructive) {
+        .confirmationDialog(tr("Delete this profile?", appLanguage), isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button(tr("Delete profile", appLanguage), role: .destructive) {
                 guard let existing else { return }
                 Task {
                     await profiles.delete(existing)
@@ -96,21 +119,23 @@ struct ProfileEditorView: View {
                 }
             }
         } message: {
-            Text("Its watch history and watchlist will be removed. This can't be undone.")
+            Text(tr("Its watch history and watchlist will be removed. This can't be undone.", appLanguage))
         }
     }
 
+    // Обратите внимание на ZStack(alignment: .topTrailing)
     private var content: some View {
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             Theme.background.ignoresSafeArea()
+            
             ScrollView {
                 VStack(spacing: 24) {
                     VStack(spacing: 8) {
-                        Text(isFirst ? "Create your profile" : (existing == nil ? "Add profile" : "Edit profile"))
+                        Text(tr(isFirst ? "Create your profile" : (existing == nil ? "Add profile" : "Edit profile"), appLanguage))
                             .font(.largeTitle.weight(.bold))
                             .foregroundStyle(.white)
                         if isFirst {
-                            Text("Everyone gets their own watch history and list.")
+                            Text(tr("Everyone gets their own watch history and list.", appLanguage))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -121,7 +146,7 @@ struct ProfileEditorView: View {
 
                     photoControls
 
-                    TextField("Name", text: $name)
+                    TextField(tr("Name", appLanguage), text: $name)
                         .textContentType(.name)
                         #if os(iOS)
                         .textInputAutocapitalization(.words)
@@ -145,7 +170,7 @@ struct ProfileEditorView: View {
                             if saving || profiles.isWorking {
                                 ProgressView().tint(Theme.onAccent)
                             } else {
-                                Text(existing == nil ? "Create" : "Save").fontWeight(.semibold)
+                                Text(tr(existing == nil ? "Create" : "Save", appLanguage)).fontWeight(.semibold)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -157,7 +182,7 @@ struct ProfileEditorView: View {
                     .disabled(!canSave)
 
                     if existing != nil {
-                        Button("Delete profile", role: .destructive) { confirmDelete = true }
+                        Button(tr("Delete profile", appLanguage), role: .destructive) { confirmDelete = true }
                             .buttonStyle(.bordered)
                             .tint(.red)
                             .disabled(profiles.isWorking)
@@ -172,6 +197,17 @@ struct ProfileEditorView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
             }
+            
+            // КНОПКА СМЕНЫ ЯЗЫКА ТОЛЬКО ДЛЯ ПЕРВОГО ЭКРАНА РЕГИСТРАЦИИ
+            if isFirst {
+                Picker("Language", selection: $appLanguage) {
+                    Text("🇷🇺 RU").tag("ru")
+                    Text("🇺🇸 EN").tag("en")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 140)
+                .padding()
+            }
         }
     }
 
@@ -180,7 +216,7 @@ struct ProfileEditorView: View {
         #if canImport(PhotosUI) && !os(tvOS)
         HStack(spacing: 16) {
             PhotosPicker(selection: $pickerItem, matching: .images) {
-                Label(draft.hasPhoto || pickedImage != nil ? "Change photo" : "Choose photo", systemImage: "photo")
+                Label(tr(draft.hasPhoto || pickedImage != nil ? "Change photo" : "Choose photo", appLanguage), systemImage: "photo")
             }
             .buttonStyle(.bordered)
             .tint(.white)
@@ -195,7 +231,7 @@ struct ProfileEditorView: View {
                 }
             }
             if draft.hasPhoto || pickedImage != nil {
-                Button("Remove") {
+                Button(tr("Remove", appLanguage)) {
                     pickedImage = nil
                     pickerItem = nil
                     removePhoto = true
@@ -205,7 +241,7 @@ struct ProfileEditorView: View {
             }
         }
         #else
-        Text("Add a photo from the iPhone, iPad or Mac app.")
+        Text(tr("Add a photo from the iPhone, iPad or Mac app.", appLanguage))
             .font(.footnote)
             .foregroundStyle(.secondary)
         #endif
