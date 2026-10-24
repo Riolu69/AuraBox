@@ -16,8 +16,8 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // Возвращаем официальный, сверхстабильный сервер Cinemeta
-        let base = isAnime ? kitsuBase : "https://v3-cinemeta.strem.io"
+        // Добавляем поддержку русского языка в путь запроса Cinemeta (формат /ru/catalog/...)
+        let base = isAnime ? kitsuBase : "https://v3-cinemeta.strem.io/ru"
         
         var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feed.rawValue)"
         var extras: [String] = []
@@ -38,8 +38,8 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        // Возвращаем Cinemeta для загрузки карточек фильмов
-        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io"
+        // Добавляем русский язык для детальной информации карточки
+        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io/ru"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
