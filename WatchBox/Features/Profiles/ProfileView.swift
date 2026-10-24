@@ -88,7 +88,6 @@ fileprivate func tr(_ key: String, _ lang: String) -> String {
 }
 
 struct ProfileView: View {
-    // Языковая переменная (синхронизируется с RootTabView)
     @AppStorage("appLanguage") private var appLanguage = "ru"
 
     @Environment(AppSettings.self) private var settings
@@ -98,7 +97,7 @@ struct ProfileView: View {
     @State private var confirmClearDownloads = false
     @State private var confirmClearStreamCache = false
     @State private var streamCacheBytes: Int64 = 0
-    @State private var showDonateAlert = false // Состояние для показа окна с картой
+    @State private var showDonateAlert = false
 
     var body: some View {
         @Bindable var settings = settings
@@ -126,7 +125,6 @@ struct ProfileView: View {
                     #endif
                 }
 
-                // Переключатель языка и Кнопка Доната (открывает окно с картой)
                 Section {
                     Picker(tr("Language / Язык", appLanguage), selection: $appLanguage) {
                         Text("🇷🇺 Русский").tag("ru")
@@ -511,11 +509,6 @@ struct ProfileView: View {
         }.value
     }
 
-    Task {
-        downloads.refreshDiskUsage()
-        await refreshStreamCacheSize()
-    }
-
     private var toggleTint: Color {
         #if os(tvOS)
         .white
@@ -550,7 +543,7 @@ struct ProfileView: View {
     }
 
     @ViewBuilder
-    private func contactRow(_ title: Support, email: String) -> some View {
+    private func contactRow(_ title: String, email: String) -> some View {
         #if os(tvOS)
         LabeledContent(title, value: email)
         #else
