@@ -16,10 +16,9 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // Переключаем Главный экран на публичный TMDB Stremio Addon для русской локализации
+        // TMDB для Главного экрана (переведенные постеры и названия)
         let base = isAnime ? kitsuBase : "https://tmdb.strem.fun/ru"
         
-        // Адаптируем названия стандартных подборок Cinemeta под формат TMDB
         var feedId = feed.rawValue
         if !isAnime {
             switch feedId {
@@ -50,8 +49,9 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        // Карточки фильмов оставляем на стабильной Cinemeta с параметром /ru
-        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io/ru"
+        // ИСПРАВЛЕНИЕ: Теперь и карточка фильма берется из TMDB, 
+        // чтобы не было ошибки "нет интернета" и всё было на русском!
+        let base = isKitsu ? kitsuBase : "https://tmdb.strem.fun/ru"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
