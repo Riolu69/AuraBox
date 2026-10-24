@@ -1,6 +1,6 @@
 //
 //  MediaCatalog.swift
-//  SceneBox
+//  Moviestream
 //
 
 import Foundation
@@ -16,8 +16,8 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // Добавляем поддержку русского языка в путь запроса Cinemeta (формат /ru/catalog/...)
-        let base = isAnime ? kitsuBase : "https://v3-cinemeta.strem.io/ru"
+        // Возвращаем стандартный адрес Cinemeta (без жесткого /ru, из-за которого пропадали подборки)
+        let base = isAnime ? kitsuBase : "https://v3-cinemeta.strem.io"
         
         var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feed.rawValue)"
         var extras: [String] = []
@@ -38,8 +38,7 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        // Добавляем русский язык для детальной информации карточки
-        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io/ru"
+        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
