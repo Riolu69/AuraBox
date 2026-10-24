@@ -1,6 +1,6 @@
 //
 //  MediaCatalog.swift
-//  Moviestream
+//  SceneBox
 //
 
 import Foundation
@@ -16,10 +16,22 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // Возвращаем стандартный адрес Cinemeta (без жесткого /ru, из-за которого пропадали подборки)
-        let base = isAnime ? kitsuBase : "https://v3-cinemeta.strem.io"
+        // Переключаем Главный экран на публичный TMDB Stremio Addon для русской локализации
+        let base = isAnime ? kitsuBase : "https://tmdb.strem.fun/ru"
         
-        var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feed.rawValue)"
+        // Адаптируем названия стандартных подборок Cinemeta под формат TMDB
+        var feedId = feed.rawValue
+        if !isAnime {
+            switch feedId {
+            case "top", "popular": feedId = "tmdb.popular"
+            case "imdbRating", "top_rated": feedId = "tmdb.top"
+            case "trending": feedId = "tmdb.trending"
+            case "new", "year": feedId = "tmdb.new"
+            default: feedId = "tmdb.popular"
+            }
+        }
+        
+        var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feedId)"
         var extras: [String] = []
         if let genre, !genre.isEmpty {
             let encoded = genre.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? genre
@@ -38,7 +50,8 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io"
+        // Карточки фильмов оставляем на стабильной Cinemeta с параметром /ru
+        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io/ru"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
