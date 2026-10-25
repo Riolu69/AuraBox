@@ -2,14 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDisplayName</key>
+	<string>Aura</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>app.scenebox.links</string>
+			<string>app.aura.links</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>scenebox</string>
+				<string>aura</string>
 				<string>magnet</string>
 			</array>
 		</dict>
