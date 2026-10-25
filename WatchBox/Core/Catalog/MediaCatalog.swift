@@ -47,11 +47,17 @@ extension TorrentSearch {
             throw CatalogError.badURL
         }
         let (data, _) = try await URLSession.shared.data(for: Self.request(url))
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        guard let meta = json?["meta"] as? [String: Any] else {
-            throw CatalogError.notFound(id)
+        
+        do {
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            guard let meta = json?["meta"] as? [String: Any] else {
+                throw CatalogError.notFound(id)
+            }
+            return Self.parseDetail(meta, fallbackType: type)
+        } catch {
+            // Если JSON не парсится, кидаем четкую ошибку формата
+            throw CatalogError.formatError("Сервер вернул данные в неожиданном формате.")
         }
-        return Self.parseDetail(meta, fallbackType: type)
     }
 
     nonisolated private static func request(_ url: URL) -> URLRequest {
@@ -118,10 +124,10 @@ extension TorrentSearch {
 
     private static func intValue(_ any: Any?) -> Int? {
         switch any {
-        case let number as Int: number
-        case let number as Double: Int(number)
-        case let text as String: Int(text)
-        default: nil
+        case let number as Int: return number
+        case let number as Double: return Int(number)
+        case let text as String: return Int(text)
+        default: return nil
         }
     }
 
@@ -143,44 +149,54 @@ extension TorrentSearch {
 
     private static func stringValue(_ any: Any?) -> String? {
         switch any {
-        case let text as String: text
-        case let number as Int: String(number)
-        case let number as Double: String(Int(number))
-        default: nil
+        case let text as String: return text
+        case let number as Int: return String(number)
+        case let number as Double: return String(Int(number))
+        default: return nil
         }
     }
 
     private static func doubleValue(_ any: Any?) -> Double? {
         switch any {
-        case let number as Double: number
-        case let number as Int: Double(number)
-        case let text as String: Double(text)
-        default: nil
+        case let number as Double: return number
+        case let number as Int: return Double(number)
+        case let text as String: return Double(text)
+        default: return nil
         }
     }
 
     private static func stringList(_ any: Any?) -> [String] {
         switch any {
-        case let list as [String]: list
-        case let single as String: [single]
-        default: []
+        case let list as [String]: return list
+        case let single as String: return [single]
+        default: return []
         }
     }
 
+    // ИСПРАВЛЕНИЕ: Поддержка простых дат (yyyy-MM-dd) в дополнение к ISO8601
     private static func parseDate(_ text: String) -> Date? {
-        ISO8601DateFormatter().date(from: text)
-            ?? ISO8601DateFormatter.withFractionalSeconds.date(from: text)
+        if let isoDate = ISO8601DateFormatter().date(from: text) {
+            return isoDate
+        }
+        if let isoFraction = ISO8601DateFormatter.withFractionalSeconds.date(from: text) {
+            return isoFraction
+        }
+        let simpleFormatter = DateFormatter()
+        simpleFormatter.dateFormat = "yyyy-MM-dd"
+        return simpleFormatter.date(from: text)
     }
 }
 
 nonisolated public enum CatalogError: Error, LocalizedError {
     case notFound(String)
     case badURL
+    case formatError(String) // Новая ошибка формата для точного отлова
 
     public var errorDescription: String? {
         switch self {
-        case .notFound(let id): "No metadata for \(id)."
-        case .badURL: "Couldn’t build a valid catalog URL."
+        case .notFound(let id): return "No metadata for \(id)."
+        case .badURL: return "Couldn’t build a valid catalog URL."
+        case .formatError(let msg): return msg
         }
     }
 }
