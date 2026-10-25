@@ -37,6 +37,10 @@ struct RootTabView: View {
     @State private var downloads = DownloadStore.shared
     @State private var watchProgress = WatchProgressStore.shared
     @State private var watchlist = WatchlistStore.shared
+    
+    // НОВОЕ: Переменная для "Буду смотреть"
+    @State private var planStore = PlanToWatchStore.shared
+    
     @Environment(ProfileStore.self) private var profiles
     @State private var profileIcon: UIImage?
     #if os(iOS)
@@ -99,7 +103,10 @@ struct RootTabView: View {
         .environment(downloads)
         .environment(watchProgress)
         .environment(watchlist)
-        // УДАЛИЛИ .preferredColorScheme(.dark), теперь тема зависит от выбора пользователя или системы!
+        
+        // НОВОЕ: Передаем хранилище вкладок вниз по иерархии
+        .environment(planStore) 
+        
         .sensoryFeedback(.selection, trigger: router.tab)
         #if os(iOS)
         .environment(\.openMediaDetail, sizeClass == .regular && !Platform.isMac ? { detailItem = $0 } : nil)
@@ -122,8 +129,11 @@ struct RootTabView: View {
             .environment(downloads)
             .environment(watchProgress)
             .environment(watchlist)
+            
+            // НОВОЕ: Передаем хранилище для всплывающих карточек фильмов на iPad/Mac
+            .environment(planStore)
+            
             .environment(\.openMediaDetail, nil)
-            // И отсюда тоже УДАЛИЛИ блокировку темной темы
         }
         #endif
     }
