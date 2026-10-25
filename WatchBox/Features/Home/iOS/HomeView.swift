@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  SceneBox
+//  Aura
 //
 
 #if os(iOS)
@@ -46,7 +46,7 @@ struct HomeView: View {
     }
 
     private var header: some View {
-        RootHeader(title: "SceneBox") {
+        RootHeader(title: "Aura") {
             HeaderIconButton(systemImage: "magnifyingglass", label: "Search") {
                 TabRouter.shared.openSearch()
             }
