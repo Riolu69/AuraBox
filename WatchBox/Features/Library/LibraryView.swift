@@ -12,9 +12,15 @@ fileprivate func tr(_ key: String, _ lang: String) -> String {
         "Library": "Медиатека",
         "Downloads": "Загрузки",
         "Watchlist": "Избранное",
+        "History": "История",
+        "Plan to Watch": "Буду смотреть",
         "Section": "Раздел",
         "No saved titles": "Нет сохраненных видео",
         "Add movies and shows to your Watchlist from their detail pages.": "Добавляйте фильмы и сериалы в Избранное со страниц описания.",
+        "No history yet": "История пуста",
+        "Titles you watch will appear here.": "Здесь появятся просмотренные фильмы и сериалы.",
+        "Nothing planned": "Нет планов",
+        "Add titles you want to watch later.": "Добавляйте фильмы и сериалы, которые хотите посмотреть позже.",
         "Remove": "Удалить",
         "Remove from Watchlist": "Удалить из Избранного",
         "Movie": "Фильм",
@@ -33,6 +39,8 @@ struct LibraryView: View {
     private enum Section: String, CaseIterable, Identifiable {
         case downloads = "Downloads"
         case watchlist = "Watchlist"
+        case history = "History"
+        case planToWatch = "Plan to Watch"
         var id: String { rawValue }
     }
 
@@ -93,6 +101,8 @@ struct LibraryView: View {
         switch section {
         case .downloads: DownloadsView()
         case .watchlist: WatchlistSection()
+        case .history: HistorySection()
+        case .planToWatch: PlanToWatchSection()
         }
     }
 
@@ -122,5 +132,31 @@ private struct WatchlistSection: View {
                 }
             }
         }
+    }
+}
+
+// Заглушка для раздела "История"
+private struct HistorySection: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+
+    var body: some View {
+        EmptyStateView(
+            systemImage: "clock.arrow.circlepath",
+            title: tr("No history yet", appLanguage),
+            message: tr("Titles you watch will appear here.", appLanguage)
+        )
+    }
+}
+
+// Заглушка для раздела "Буду смотреть"
+private struct PlanToWatchSection: View {
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+
+    var body: some View {
+        EmptyStateView(
+            systemImage: "calendar.badge.clock",
+            title: tr("Nothing planned", appLanguage),
+            message: tr("Add titles you want to watch later.", appLanguage)
+        )
     }
 }
