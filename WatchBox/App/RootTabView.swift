@@ -99,7 +99,7 @@ struct RootTabView: View {
         .environment(downloads)
         .environment(watchProgress)
         .environment(watchlist)
-        .preferredColorScheme(.dark)
+        // УДАЛИЛИ .preferredColorScheme(.dark), теперь тема зависит от выбора пользователя или системы!
         .sensoryFeedback(.selection, trigger: router.tab)
         #if os(iOS)
         .environment(\.openMediaDetail, sizeClass == .regular && !Platform.isMac ? { detailItem = $0 } : nil)
@@ -123,7 +123,7 @@ struct RootTabView: View {
             .environment(watchProgress)
             .environment(watchlist)
             .environment(\.openMediaDetail, nil)
-            .preferredColorScheme(.dark)
+            // И отсюда тоже УДАЛИЛИ блокировку темной темы
         }
         #endif
     }
