@@ -2,8 +2,6 @@
 //  HomeView.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 19.08.26.
-//
 
 #if os(iOS)
 import SwiftUI
@@ -161,6 +159,8 @@ private struct FeaturedMarquee: View {
                     }
                 }
                 .scrollTargetLayout()
+                // Паддинги для красивого скролла
+                .padding(.vertical, 10) 
             }
             .contentMargins(.horizontal, 16, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
@@ -194,15 +194,15 @@ private struct FeaturedCard: View {
             }
             .overlay {
                 LinearGradient(stops: [
-                    .init(color: .clear, location: 0.35),
-                    .init(color: .black.opacity(0.55), location: 0.7),
-                    .init(color: .black.opacity(0.88), location: 1),
+                    .init(color: .clear, location: 0.25),
+                    .init(color: .black.opacity(0.4), location: 0.6),
+                    .init(color: .black.opacity(0.85), location: 1),
                 ], startPoint: .top, endPoint: .bottom)
             }
             .overlay(alignment: .bottomLeading) { caption }
             .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
-                .strokeBorder(Theme.hairline))
+            // Добавлена нативная эппловская мягкая тень (Drop Shadow)
+            .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
             .contentShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
             .accessibilityElement(children: .combine)
             .accessibilityLabel(item.name)
@@ -235,7 +235,7 @@ private struct FeaturedCard: View {
                 }
             }
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.8))
+            .foregroundStyle(.white.opacity(0.85))
         }
         .padding(18)
     }
@@ -247,7 +247,6 @@ private struct FeaturedCard: View {
             .lineLimit(2)
             .minimumScaleFactor(0.7)
     }
-
 }
 
 /// Sits over the card (not inside its link) so the tap reaches it.
@@ -267,7 +266,8 @@ private struct FeaturedWatchlistButton: View {
                 .foregroundStyle(saved ? Theme.accent : .white)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 38, height: 38)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(.ultraThinMaterial, in: Circle()) // Apple Blur
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.pressable)
         .sensoryFeedback(.selection, trigger: saved)
@@ -284,7 +284,7 @@ private struct PageDots: View {
         HStack(spacing: 6) {
             ForEach(0..<count, id: \.self) { i in
                 Capsule()
-                    .fill(i == index ? Theme.accent : Color.white.opacity(0.25))
+                    .fill(i == index ? Theme.accent : Color.gray.opacity(0.3))
                     .frame(width: i == index ? 18 : 6, height: 6)
             }
         }
@@ -330,6 +330,7 @@ private struct PosterShelf: View {
                     }
                 }
                 .padding(.horizontal, 16)
+                .padding(.vertical, 8) // Даем место для теней
             }
         }
     }
@@ -348,7 +349,7 @@ private struct RankedCard: View {
         HStack(alignment: .bottom, spacing: -width * 0.16) {
             Text(String(rank))   // Western digits in every locale, like the posters
                 .font(.display(size, weight: .black))
-                .foregroundStyle(.linearGradient(colors: [.white.opacity(0.92), .white.opacity(0.1)],
+                .foregroundStyle(.linearGradient(colors: [.primary.opacity(0.8), .primary.opacity(0.1)],
                                                  startPoint: .top, endPoint: .bottom))
                 .fixedSize()
                 // Trim the line box to the digits so they stand on the poster's bottom edge.
@@ -356,7 +357,7 @@ private struct RankedCard: View {
                 .padding(.bottom, metrics.descender)
             PosterCard(item: item)
                 .frame(width: width)
-                .shadow(color: .black.opacity(0.6), radius: 8, x: -3)
+                .shadow(color: Color.black.opacity(0.15), radius: 8, x: -3, y: 4)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Number \(rank), \(item.name)")
