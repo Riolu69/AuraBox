@@ -2,8 +2,6 @@
 //  PosterCard.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 08.08.26.
-//
 
 #if os(iOS)
 import SwiftUI
@@ -16,6 +14,7 @@ struct PosterCard: View {
     var body: some View {
         let saved = progress?.progress(for: item.id)
         let watchedMovie = item.type == .movie && saved?.isFinished == true
+        
         PosterImage(url: item.posterURL)
             .overlay(alignment: .topTrailing) {
                 if watchedMovie {
@@ -26,7 +25,9 @@ struct PosterCard: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(5)
-                        .background(.black.opacity(0.55), in: Circle())
+                        // Используем системный блюр для подложки иконки
+                        .background(.regularMaterial, in: Circle())
+                        .environment(\.colorScheme, .dark) // Всегда темный блюр на постерах
                         .padding(6)
                 }
             }
@@ -36,6 +37,16 @@ struct PosterCard: View {
                         .padding(6)
                 }
             }
+            // --- APPLE-СТИЛЬ ДЛЯ КАРТОЧЕК ---
+            .clipShape(RoundedRectangle(cornerRadius: Theme.posterCorner, style: .continuous))
+            // Добавляем фирменную мягкую тень
+            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+            // Добавляем микро-рамку (hairline) для идеального контура
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.posterCorner, style: .continuous)
+                    .strokeBorder(Theme.hairline, lineWidth: 0.5)
+            )
+            // --------------------------------
             .accessibilityLabel(item.name)
             .contentShape(.contextMenuPreview,
                           RoundedRectangle(cornerRadius: Theme.posterCorner, style: .continuous))
