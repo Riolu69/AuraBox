@@ -25,6 +25,7 @@ struct MediaDetailView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(WatchProgressStore.self) private var progressStore
     @Environment(WatchlistStore.self) private var watchlist
+    @Environment(PlanToWatchStore.self) private var planStore // Добавлено хранилище планов
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dismiss) private var dismiss
@@ -321,6 +322,7 @@ struct MediaDetailView: View {
                 .accessibilityLabel("Download")
             }
 
+            // Избранное
             Button {
                 watchlist.toggle(id: mediaID, mediaType: type,
                                  title: detail.name.isEmpty ? fallbackTitle : detail.name,
@@ -334,6 +336,25 @@ struct MediaDetailView: View {
             .tint(isInWatchlist ? Theme.accent : .primary)
             .sensoryFeedback(.selection, trigger: isInWatchlist)
             .accessibilityLabel(isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist")
+            
+            // НОВАЯ КНОПКА: Буду смотреть
+            let isPlanned = planStore.contains(mediaID)
+            Button {
+                planStore.toggle(id: mediaID, mediaType: type,
+                                 title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                 posterURL: detail.posterURL)
+                toast = ToastMessage(text: isPlanned ? "Удалено из планов" : "Добавлено в Буду смотреть",
+                                     systemImage: isPlanned ? "calendar.badge.minus" : "calendar.badge.plus")
+            } label: {
+                Image(systemName: isPlanned ? "calendar.badge.clock" : "calendar")
+                    .contentTransition(.symbolEffect(.replace))
+                    .frame(minHeight: labelHeight)
+                    .padding(.vertical, 4)
+            }
+            .buttonStyle(.bordered)
+            .tint(isPlanned ? Theme.accent : .primary)
+            .sensoryFeedback(.selection, trigger: isPlanned)
+            .accessibilityLabel(isPlanned ? "Удалить из Буду смотреть" : "Добавить в Буду смотреть")
 
             if detail.type == .movie {
                 let watched = progressStore.isMovieWatched(mediaID)
