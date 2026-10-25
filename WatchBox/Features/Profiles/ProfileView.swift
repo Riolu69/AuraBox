@@ -106,303 +106,303 @@ struct ProfileView: View {
 
         NavigationStack {
             VStack(spacing: 0) {
-            #if !os(tvOS)
-            RootHeader(title: tr("Profile", appLanguage)) { profileMenu }
-            #endif
-            Form {
-                PageTitleRow(tr("Profile", appLanguage))
-                if let profile = profiles.selected {
-                    Section {
-                        profileHeader(profile)
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-                    #if os(tvOS)
-                    Section {
-                        Button(tr("Switch profile", appLanguage)) { profiles.deselect() }
-                        if profiles.profiles.count < Profile.maxPerAccount {
-                            Button(tr("Add profile", appLanguage)) { editing = .create(first: false) }
+                #if !os(tvOS)
+                RootHeader(title: tr("Profile", appLanguage)) { profileMenu }
+                #endif
+                Form {
+                    PageTitleRow(tr("Profile", appLanguage))
+                    if let profile = profiles.selected {
+                        Section {
+                            profileHeader(profile)
                         }
-                    }
-                    #endif
-                }
-
-                Section {
-                    Picker(tr("Theme", appLanguage), selection: $themeMode) {
-                        Text(tr("System", appLanguage)).tag("Auto")
-                        Text(tr("Light", appLanguage)).tag("Light")
-                        Text(tr("Dark", appLanguage)).tag("Dark")
-                    }
-                    .pickerStyle(.segmented)
-                    
-                    Picker(tr("Language / Язык", appLanguage), selection: $appLanguage) {
-                        Text("🇷🇺 Русский").tag("ru")
-                        Text("🇺🇸 English").tag("en")
-                    }
-                    .pickerStyle(.segmented)
-                    
-                    Button(action: {
-                        if let url = URL(string: "https://boosty.to/ВАША_ССЫЛКА") {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "heart.fill")
-                                .foregroundStyle(.pink)
-                            Text(tr("Support the developer", appLanguage))
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
-
-                Section(tr("Stream quality", appLanguage)) {
-                    Picker(tr("Sort releases by", appLanguage), selection: $settings.releaseSort) {
-                        ForEach(ReleaseSort.allCases) { sort in
-                            Text(sort.title).tag(sort)
-                        }
-                    }
-                    Picker(tr("Prefer resolution", appLanguage), selection: $settings.preferredResolution) {
-                        ForEach(["2160p", "1080p", "720p", "480p"], id: \.self) { res in
-                            Text(res == "2160p" ? "4K" : res).tag(res)
-                        }
-                    }
-                    NavigationLink {
-                        QualityFilterList()
-                    } label: {
-                        LabeledContent(tr("Hide qualities", appLanguage), value: hiddenSummary)
-                    }
-                }
-
-                Section {
-                    Toggle(tr("Auto-pick best source", appLanguage), isOn: $settings.autoSelectSource)
-                        .tint(toggleTint)
-                } header: {
-                    Text(tr("Sources", appLanguage))
-                } footer: {
-                    Text(tr("Skip the release list and start the best match automatically.", appLanguage))
-                }
-
-                Section {
-                    ForEach(StreamProvider.queryOrder) { provider in
-                        let locked = provider.requiresDebrid && !settings.hasRealDebridKey
-                        Toggle(isOn: sourceBinding(provider)) {
-                            if locked {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(provider.title)
-                                    Text(tr("Needs a Real-Debrid key", appLanguage))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } else {
-                                Text(provider.title)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
+                        #if os(tvOS)
+                        Section {
+                            Button(tr("Switch profile", appLanguage)) { profiles.deselect() }
+                            if profiles.profiles.count < Profile.maxPerAccount {
+                                Button(tr("Add profile", appLanguage)) { editing = .create(first: false) }
                             }
                         }
-                        .disabled(locked)
-                        .tint(toggleTint)
-                    }
-                    Toggle(tr("Extra public providers", appLanguage), isOn: $settings.extraSourceProviders)
-                        .tint(toggleTint)
-                } header: {
-                    Text(tr("Stream sources", appLanguage))
-                } footer: {
-                    if settings.enabledSources.isEmpty {
-                        Text(tr("Turn on at least one source.", appLanguage))
-                    } else {
-                        Text(tr("Peer-to-peer streams connect you directly to other peers, who can see your IP address. Use a VPN, or a debrid service (which fetches on your behalf), if that matters to you.", appLanguage))
-                    }
-                }
-
-                Section {
-                    Toggle(tr("Send debrid key to community sources", appLanguage), isOn: $settings.shareDebridKeyWithCommunitySources)
-                        .tint(toggleTint)
-                    LabeledContent(tr("StremThru server", appLanguage)) {
-                        TextField("https://…", text: $settings.stremthruHost)
-                            .autocorrectionDisabled()
-                            .tint(.primary)
-                            .multilineTextAlignment(.trailing)
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.URL)
-                            #endif
-                    }
-                } header: {
-                    Text(tr("Source privacy", appLanguage))
-                } footer: {
-                    Text(tr("Comet and StremThru are community-run servers. The Stremio protocol puts your debrid key in every request to them, so whoever runs the server can read it. Off: they're used peer-to-peer only (Comet is skipped). Torrentio's official server always receives the key.", appLanguage))
-                }
-
-                Section {
-                    Picker(tr("Service", appLanguage), selection: $settings.debridProvider) {
-                        ForEach(DebridProvider.allCases) { provider in
-                            Text(provider.title).tag(provider)
-                        }
-                    }
-                    if settings.debridProvider.requiresKey {
-                        SecureField(tr("API key", appLanguage), text: $settings.debridAPIKey)
-                            .autocorrectionDisabled()
-                            .tint(.primary)
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            #endif
-                    }
-                } header: {
-                    Text(tr("Debrid", appLanguage))
-                } footer: {
-                    if let hint = settings.debridProvider.keyHint {
-                        Text("\(tr("API key", appLanguage)): \(hint)")
-                    } else {
-                        Text(tr("Stream cached torrents at full speed instead of peer-to-peer.", appLanguage))
-                    }
-                }
-
-                Section {
-                    SecureField(tr("TMDB API key", appLanguage), text: $settings.tmdbAPIKey)
-                        .autocorrectionDisabled()
-                        .tint(.primary)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
                         #endif
-                } header: {
-                    Text(tr("Cast", appLanguage))
-                } footer: {
-                    Text(tr("A free TMDB key adds cast photos and filmographies.", appLanguage))
-                }
+                    }
 
-                SubtitleKeysSection()
+                    Section {
+                        Picker(tr("Theme", appLanguage), selection: $themeMode) {
+                            Text(tr("System", appLanguage)).tag("Auto")
+                            Text(tr("Light", appLanguage)).tag("Light")
+                            Text(tr("Dark", appLanguage)).tag("Dark")
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Picker(tr("Language / Язык", appLanguage), selection: $appLanguage) {
+                            Text("🇷🇺 Русский").tag("ru")
+                            Text("🇺🇸 English").tag("en")
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Button(action: {
+                            if let url = URL(string: "https://boosty.to/ВАША_ССЫЛКА") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "heart.fill")
+                                    .foregroundStyle(.pink)
+                                Text(tr("Support the developer", appLanguage))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
 
-                Section {
-                    Picker(tr("Default audio", appLanguage), selection: $settings.preferredAudioLanguage) {
-                        ForEach(AppSettings.audioLanguageOptions, id: \.code) { option in
-                            Text(option.name).tag(option.code)
+                    Section(tr("Stream quality", appLanguage)) {
+                        Picker(tr("Sort releases by", appLanguage), selection: $settings.releaseSort) {
+                            ForEach(ReleaseSort.allCases) { sort in
+                                Text(sort.title).tag(sort)
+                            }
+                        }
+                        Picker(tr("Prefer resolution", appLanguage), selection: $settings.preferredResolution) {
+                            ForEach(["2160p", "1080p", "720p", "480p"], id: \.self) { res in
+                                Text(res == "2160p" ? "4K" : res).tag(res)
+                            }
+                        }
+                        NavigationLink {
+                            QualityFilterList()
+                        } label: {
+                            LabeledContent(tr("Hide qualities", appLanguage), value: hiddenSummary)
                         }
                     }
-                    Picker(tr("Default subtitles", appLanguage), selection: $settings.preferredSubtitleLanguage) {
-                        ForEach(SubtitleLanguage.offered) { lang in
-                            Text(lang.name).tag(lang.code)
-                        }
-                    }
-                    Picker(tr("Subtitle size", appLanguage), selection: $settings.subtitleScale) {
-                        ForEach(AppSettings.subtitleScaleOptions, id: \.self) { scale in
-                            Text(String(format: "%.2g×", scale)).tag(scale)
-                        }
-                    }
-                    SubtitleSizePreview(scale: settings.subtitleScale)
-                    Toggle(tr("Fill screen (crop)", appLanguage), isOn: $settings.fillScreen)
-                        .tint(toggleTint)
-                    Picker(tr("Player buffer", appLanguage), selection: $settings.networkCacheMilliseconds) {
-                        Text("2 s").tag(2000)
-                        Text("3 s").tag(3000)
-                        Text("5 s").tag(5000)
-                        Text("10 s").tag(10000)
-                        Text("20 s").tag(20000)
-                    }
-                } header: {
-                    Text(tr("Playback", appLanguage))
-                } footer: {
-                    Text(tr("Default audio is used when a title was made in that language (or its language is unknown); a foreign title keeps its original audio instead of a dub. Subtitles in your default language are fetched from OpenSubtitles as soon as you press play.\n\nPlayer buffer is how many seconds the player holds ahead. Larger smooths slow downloads but starts slower; 3 seconds suits most connections.", appLanguage))
-                }
 
-                Section {
-                    LabeledContent(tr("Downloads", appLanguage), value: ByteFormat.size(downloads.diskUsage))
-                    Picker(tr("Download limit", appLanguage), selection: $settings.storageCapBytes) {
-                        Text(tr("Unlimited", appLanguage)).tag(Int64(0))
-                        Text("5 GB").tag(Int64(5) << 30)
-                        Text("10 GB").tag(Int64(10) << 30)
-                        Text("25 GB").tag(Int64(25) << 30)
-                        Text("50 GB").tag(Int64(50) << 30)
-                    }
-                    Button(tr("Delete all downloads", appLanguage), role: .destructive) {
-                        confirmClearDownloads = true
-                    }
-                    .disabled(downloads.downloads.isEmpty)
-
-                    LabeledContent(tr("Cache", appLanguage), value: ByteFormat.size(streamCacheBytes))
-                    Picker(tr("Stream cache limit", appLanguage), selection: $settings.streamCacheLimitGB) {
-                        ForEach(AppSettings.streamCacheOptions, id: \.self) { gb in
-                            Text(gb == 0 ? tr("Off", appLanguage) : "\(gb) GB").tag(gb)
-                        }
-                    }
-                    Button(tr("Clear cache", appLanguage), role: .destructive) {
-                        confirmClearStreamCache = true
-                    }
-                    .disabled(streamCacheBytes == 0)
-                    Toggle(tr("Keep fully streamed videos", appLanguage), isOn: $settings.keepFinishedStreams)
-                } header: {
-                    Text(tr("Storage", appLanguage))
-                } footer: {
-                    Text(tr("New downloads won't start past the download limit. The cache keeps recently streamed video (so re-opening starts instantly; the oldest goes past the stream cache limit) plus downloaded and translated subtitles. Clearing it keeps your downloads and your saved subtitle choices. With \"Keep fully streamed videos\" on, a video that finished downloading while you watched moves from the cache to Downloads, to play offline.", appLanguage))
-                }
-
-                Section {
-                    Picker(tr("Simultaneous downloads", appLanguage), selection: $settings.maxSimultaneousDownloads) {
-                        ForEach(AppSettings.simultaneousDownloadOptions, id: \.self) { count in
-                            Text("\(count)").tag(count)
-                        }
-                    }
-                    #if os(iOS)
-                    Picker(tr("Keep downloading in background", appLanguage), selection: $settings.backgroundDownloadMode) {
-                        ForEach(BackgroundDownloadMode.allCases) { mode in
-                            Text(tr(mode.title, appLanguage)).tag(mode)
-                        }
-                    }
-                    if #available(iOS 26, *) {
-                        Toggle(tr("Show progress in Live Activity", appLanguage), isOn: $settings.downloadLiveActivity)
+                    Section {
+                        Toggle(tr("Auto-pick best source", appLanguage), isOn: $settings.autoSelectSource)
                             .tint(toggleTint)
+                    } header: {
+                        Text(tr("Sources", appLanguage))
+                    } footer: {
+                        Text(tr("Skip the release list and start the best match automatically.", appLanguage))
                     }
-                    #endif
-                } header: {
-                    Text(tr("Downloads", appLanguage))
-                } footer: {
-                    #if os(iOS)
-                    Text(tr("Extra downloads wait in a queue and start automatically. iOS normally freezes an app a few seconds after you leave it, which drops every peer; background mode keeps SceneBox running while downloads are active by playing silent audio that mixes with your music. Smart uses short pulses to save battery; switch to Always-on audio if downloads still stop. Closing SceneBox from the app switcher always stops downloads. The Live Activity shows progress on the Lock Screen, but iOS may mark it failed while a torrent is still looking for peers; downloads carry on regardless.", appLanguage))
-                    #else
-                    Text(tr("Extra downloads wait in a queue and start automatically.", appLanguage))
-                    #endif
-                }
 
-                Section {
-                    Picker(tr("Max peers", appLanguage), selection: $settings.maxPeers) {
-                        ForEach([20, 40, 60, 80, 100, 150, 200], id: \.self) { count in
-                            Text("\(count)").tag(count)
+                    Section {
+                        ForEach(StreamProvider.queryOrder) { provider in
+                            let locked = provider.requiresDebrid && !settings.hasRealDebridKey
+                            Toggle(isOn: sourceBinding(provider)) {
+                                if locked {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(provider.title)
+                                        Text(tr("Needs a Real-Debrid key", appLanguage))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                } else {
+                                    Text(provider.title)
+                                }
+                            }
+                            .disabled(locked)
+                            .tint(toggleTint)
+                        }
+                        Toggle(tr("Extra public providers", appLanguage), isOn: $settings.extraSourceProviders)
+                            .tint(toggleTint)
+                    } header: {
+                        Text(tr("Stream sources", appLanguage))
+                    } footer: {
+                        if settings.enabledSources.isEmpty {
+                            Text(tr("Turn on at least one source.", appLanguage))
+                        } else {
+                            Text(tr("Peer-to-peer streams connect you directly to other peers, who can see your IP address. Use a VPN, or a debrid service (which fetches on your behalf), if that matters to you.", appLanguage))
                         }
                     }
-                    LabeledContent(tr("Streaming port", appLanguage)) {
-                        TextField("Port", value: portBinding, format: .number.grouping(.never))
-                            #if os(iOS)
-                            .keyboardType(.numberPad)
-                            #endif
-                            .tint(.primary)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 90)
-                    }
-                    Toggle(tr("Download over Wi-Fi only", appLanguage), isOn: $settings.wifiOnly)
-                        .tint(toggleTint)
-                    NavigationLink(tr("Custom trackers", appLanguage)) {
-                        TrackerEditor()
-                    }
-                } header: {
-                    Text(tr("Network", appLanguage))
-                } footer: {
-                    Text(tr("Ports 1024–65535; if it's busy the app picks a free one automatically. Wi-Fi only pauses downloads on cellular and resumes them on Wi-Fi. Custom trackers are announced in addition to each torrent's own.", appLanguage))
-                }
 
-                Section {
-                    contactRow(tr("Support", appLanguage), email: "spontaneousarray@gmail.com")
-                    NavigationLink(tr("Credits", appLanguage)) { CreditsView() }
-                } header: {
-                    Text(tr("About", appLanguage))
-                } footer: {
-                    Text("SceneBox \(appVersion) (\(buildNumber))")
+                    Section {
+                        Toggle(tr("Send debrid key to community sources", appLanguage), isOn: $settings.shareDebridKeyWithCommunitySources)
+                            .tint(toggleTint)
+                        LabeledContent(tr("StremThru server", appLanguage)) {
+                            TextField("https://…", text: $settings.stremthruHost)
+                                .autocorrectionDisabled()
+                                .tint(.primary)
+                                .multilineTextAlignment(.trailing)
+                                #if os(iOS)
+                                .textInputAutocapitalization(.never)
+                                .keyboardType(.URL)
+                                #endif
+                        }
+                    } header: {
+                        Text(tr("Source privacy", appLanguage))
+                    } footer: {
+                        Text(tr("Comet and StremThru are community-run servers. The Stremio protocol puts your debrid key in every request to them, so whoever runs the server can read it. Off: they're used peer-to-peer only (Comet is skipped). Torrentio's official server always receives the key.", appLanguage))
+                    }
+
+                    Section {
+                        Picker(tr("Service", appLanguage), selection: $settings.debridProvider) {
+                            ForEach(DebridProvider.allCases) { provider in
+                                Text(provider.title).tag(provider)
+                            }
+                        }
+                        if settings.debridProvider.requiresKey {
+                            SecureField(tr("API key", appLanguage), text: $settings.debridAPIKey)
+                                .autocorrectionDisabled()
+                                .tint(.primary)
+                                #if os(iOS)
+                                .textInputAutocapitalization(.never)
+                                #endif
+                        }
+                    } header: {
+                        Text(tr("Debrid", appLanguage))
+                    } footer: {
+                        if let hint = settings.debridProvider.keyHint {
+                            Text("\(tr("API key", appLanguage)): \(hint)")
+                        } else {
+                            Text(tr("Stream cached torrents at full speed instead of peer-to-peer.", appLanguage))
+                        }
+                    }
+
+                    Section {
+                        SecureField(tr("TMDB API key", appLanguage), text: $settings.tmdbAPIKey)
+                            .autocorrectionDisabled()
+                            .tint(.primary)
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            #endif
+                    } header: {
+                        Text(tr("Cast", appLanguage))
+                    } footer: {
+                        Text(tr("A free TMDB key adds cast photos and filmographies.", appLanguage))
+                    }
+
+                    SubtitleKeysSection()
+
+                    Section {
+                        Picker(tr("Default audio", appLanguage), selection: $settings.preferredAudioLanguage) {
+                            ForEach(AppSettings.audioLanguageOptions, id: \.code) { option in
+                                Text(option.name).tag(option.code)
+                            }
+                        }
+                        Picker(tr("Default subtitles", appLanguage), selection: $settings.preferredSubtitleLanguage) {
+                            ForEach(SubtitleLanguage.offered) { lang in
+                                Text(lang.name).tag(lang.code)
+                            }
+                        }
+                        Picker(tr("Subtitle size", appLanguage), selection: $settings.subtitleScale) {
+                            ForEach(AppSettings.subtitleScaleOptions, id: \.self) { scale in
+                                Text(String(format: "%.2g×", scale)).tag(scale)
+                            }
+                        }
+                        SubtitleSizePreview(scale: settings.subtitleScale)
+                        Toggle(tr("Fill screen (crop)", appLanguage), isOn: $settings.fillScreen)
+                            .tint(toggleTint)
+                        Picker(tr("Player buffer", appLanguage), selection: $settings.networkCacheMilliseconds) {
+                            Text("2 s").tag(2000)
+                            Text("3 s").tag(3000)
+                            Text("5 s").tag(5000)
+                            Text("10 s").tag(10000)
+                            Text("20 s").tag(20000)
+                        }
+                    } header: {
+                        Text(tr("Playback", appLanguage))
+                    } footer: {
+                        Text(tr("Default audio is used when a title was made in that language (or its language is unknown); a foreign title keeps its original audio instead of a dub. Subtitles in your default language are fetched from OpenSubtitles as soon as you press play.\n\nPlayer buffer is how many seconds the player holds ahead. Larger smooths slow downloads but starts slower; 3 seconds suits most connections.", appLanguage))
+                    }
+
+                    Section {
+                        LabeledContent(tr("Downloads", appLanguage), value: ByteFormat.size(downloads.diskUsage))
+                        Picker(tr("Download limit", appLanguage), selection: $settings.storageCapBytes) {
+                            Text(tr("Unlimited", appLanguage)).tag(Int64(0))
+                            Text("5 GB").tag(Int64(5) << 30)
+                            Text("10 GB").tag(Int64(10) << 30)
+                            Text("25 GB").tag(Int64(25) << 30)
+                            Text("50 GB").tag(Int64(50) << 30)
+                        }
+                        Button(tr("Delete all downloads", appLanguage), role: .destructive) {
+                            confirmClearDownloads = true
+                        }
+                        .disabled(downloads.downloads.isEmpty)
+
+                        LabeledContent(tr("Cache", appLanguage), value: ByteFormat.size(streamCacheBytes))
+                        Picker(tr("Stream cache limit", appLanguage), selection: $settings.streamCacheLimitGB) {
+                            ForEach(AppSettings.streamCacheOptions, id: \.self) { gb in
+                                Text(gb == 0 ? tr("Off", appLanguage) : "\(gb) GB").tag(gb)
+                            }
+                        }
+                        Button(tr("Clear cache", appLanguage), role: .destructive) {
+                            confirmClearStreamCache = true
+                        }
+                        .disabled(streamCacheBytes == 0)
+                        Toggle(tr("Keep fully streamed videos", appLanguage), isOn: $settings.keepFinishedStreams)
+                    } header: {
+                        Text(tr("Storage", appLanguage))
+                    } footer: {
+                        Text(tr("New downloads won't start past the download limit. The cache keeps recently streamed video (so re-opening starts instantly; the oldest goes past the stream cache limit) plus downloaded and translated subtitles. Clearing it keeps your downloads and your saved subtitle choices. With \"Keep fully streamed videos\" on, a video that finished downloading while you watched moves from the cache to Downloads, to play offline.", appLanguage))
+                    }
+
+                    Section {
+                        Picker(tr("Simultaneous downloads", appLanguage), selection: $settings.maxSimultaneousDownloads) {
+                            ForEach(AppSettings.simultaneousDownloadOptions, id: \.self) { count in
+                                Text("\(count)").tag(count)
+                            }
+                        }
+                        #if os(iOS)
+                        Picker(tr("Keep downloading in background", appLanguage), selection: $settings.backgroundDownloadMode) {
+                            ForEach(BackgroundDownloadMode.allCases) { mode in
+                                Text(tr(mode.title, appLanguage)).tag(mode)
+                            }
+                        }
+                        if #available(iOS 26, *) {
+                            Toggle(tr("Show progress in Live Activity", appLanguage), isOn: $settings.downloadLiveActivity)
+                                .tint(toggleTint)
+                        }
+                        #endif
+                    } header: {
+                        Text(tr("Downloads", appLanguage))
+                    } footer: {
+                        #if os(iOS)
+                        Text(tr("Extra downloads wait in a queue and start automatically. iOS normally freezes an app a few seconds after you leave it, which drops every peer; background mode keeps SceneBox running while downloads are active by playing silent audio that mixes with your music. Smart uses short pulses to save battery; switch to Always-on audio if downloads still stop. Closing SceneBox from the app switcher always stops downloads. The Live Activity shows progress on the Lock Screen, but iOS may mark it failed while a torrent is still looking for peers; downloads carry on regardless.", appLanguage))
+                        #else
+                        Text(tr("Extra downloads wait in a queue and start automatically.", appLanguage))
+                        #endif
+                    }
+
+                    Section {
+                        Picker(tr("Max peers", appLanguage), selection: $settings.maxPeers) {
+                            ForEach([20, 40, 60, 80, 100, 150, 200], id: \.self) { count in
+                                Text("\(count)").tag(count)
+                            }
+                        }
+                        LabeledContent(tr("Streaming port", appLanguage)) {
+                            TextField("Port", value: portBinding, format: .number.grouping(.never))
+                                #if os(iOS)
+                                .keyboardType(.numberPad)
+                                #endif
+                                .tint(.primary)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 90)
+                        }
+                        Toggle(tr("Download over Wi-Fi only", appLanguage), isOn: $settings.wifiOnly)
+                            .tint(toggleTint)
+                        NavigationLink(tr("Custom trackers", appLanguage)) {
+                            TrackerEditor()
+                        }
+                    } header: {
+                        Text(tr("Network", appLanguage))
+                    } footer: {
+                        Text(tr("Ports 1024–65535; if it's busy the app picks a free one automatically. Wi-Fi only pauses downloads on cellular and resumes them on Wi-Fi. Custom trackers are announced in addition to each torrent's own.", appLanguage))
+                    }
+
+                    Section {
+                        contactRow(tr("Support", appLanguage), email: "spontaneousarray@gmail.com")
+                        NavigationLink(tr("Credits", appLanguage)) { CreditsView() }
+                    } header: {
+                        Text(tr("About", appLanguage))
+                    } footer: {
+                        Text("SceneBox \(appVersion) (\(buildNumber))")
+                    }
                 }
-            }
-            .hideScrollBackground()
-            #if !os(tvOS)
-            .contentMargins(.top, 4, for: .scrollContent)
-            #endif
+                .hideScrollBackground()
+                #if !os(tvOS)
+                .contentMargins(.top, 4, for: .scrollContent)
+                #endif
             }
             .background(Theme.background)
             #if os(tvOS)
@@ -417,16 +417,12 @@ struct ProfileView: View {
             }
             .tint(.primary)
         }
-        .confirmationDialog(tr("Delete all downloads?", appLanguage),
-                            isPresented: $confirmClearDownloads,
-                            titleVisibility: .visible) {
+        .confirmationDialog(tr("Delete all downloads?", appLanguage), isPresented: $confirmClearDownloads) {
             Button(tr("Delete everything", appLanguage), role: .destructive) { downloads.removeAll() }
         } message: {
             Text(tr("Every downloaded file and its resume data will be removed.", appLanguage))
         }
-        .confirmationDialog(tr("Clear cache?", appLanguage),
-                            isPresented: $confirmClearStreamCache,
-                            titleVisibility: .visible) {
+        .confirmationDialog(tr("Clear cache?", appLanguage), isPresented: $confirmClearStreamCache) {
             Button(tr("Clear", appLanguage), role: .destructive) {
                 StreamCoordinator.purgeStreamCache()
                 TranslationCenter.shared.cancelAll()
