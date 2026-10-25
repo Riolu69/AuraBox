@@ -17,7 +17,7 @@ struct TVPosterShelf: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, TVHomeView.edge)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -45,14 +45,19 @@ struct TVPosterShelf: View {
 }
 
 private struct TVSeeAllCard: View {
+    // Подхватываем текущий язык из настроек приложения
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+
     var body: some View {
         VStack(spacing: 18) {
             Image(systemName: "chevron.forward.circle.fill").font(.system(size: 64))
-            Text("See All").font(.title3.weight(.semibold))
+            // Динамический перевод кнопки
+            Text(appLanguage == "ru" ? "Смотреть все" : "See All")
+                .font(.title3.weight(.semibold))
         }
-        .foregroundStyle(.white.opacity(0.9))
+        .foregroundStyle(.primary)
         .frame(width: 260, height: 390)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 #endif
