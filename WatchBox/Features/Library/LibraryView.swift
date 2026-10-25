@@ -21,7 +21,10 @@ fileprivate func tr(_ key: String, _ lang: String) -> String {
         "No history yet": "История пуста",
         "Titles you watch will appear here.": "Здесь появятся просмотренные фильмы и сериалы.",
         "Nothing planned": "Нет планов",
-        "Add titles you want to watch later.": "Добавляйте фильмы и сериалы, которые хотите посмотреть позже."
+        "Add titles you want to watch later.": "Добавляйте фильмы и сериалы, которые хотите посмотреть позже.",
+        "Remove from Watchlist": "Удалить из Избранного",
+        "Remove from Plan to Watch": "Удалить из планов",
+        "Remove from History": "Удалить из истории"
     ]
     return dict[key] ?? key
 }
@@ -151,7 +154,6 @@ private struct MediaGridItem: Identifiable {
     let poster: String?
     let type: MediaType
     
-    // Генерируем MediaResult для правильной навигации
     var result: MediaResult {
         MediaResult(id: id, type: type, name: title, year: nil, posterURL: poster.flatMap(URL.init(string:)), description: nil)
     }
@@ -159,14 +161,18 @@ private struct MediaGridItem: Identifiable {
 
 private struct MediaGridView: View {
     let items: [MediaGridItem]
-    
     let columns = [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 16)]
+
+    // Подключаем сторы для возможности удаления
+    @AppStorage("appLanguage") private var appLanguage = "ru"
+    @Environment(WatchlistStore.self) private var watchlist
+    @Environment(WatchProgressStore.self) private var progressStore
+    @Environment(PlanToWatchStore.self) private var planStore
 
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(items) { item in
-                    // ИСПРАВЛЕНИЕ: Передаем MediaResult, как это ожидает приложение
                     NavigationLink(value: item.result) {
                         VStack(alignment: .leading) {
                             if let posterString = item.poster, let url = URL(string: posterString) {
@@ -190,6 +196,30 @@ private struct MediaGridView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    // ДОБАВЛЯЕМ КОНТЕКСТНОЕ МЕНЮ С УДАЛЕНИЕМ
+                    .contextMenu {
+                        if watchlist.contains(item.id) {
+                            Button(role: .destructive) {
+                                watchlist.remove(id: item.id)
+                            } label: {
+                                Label(tr("Remove from Watchlist", appLanguage), systemImage: "bookmark.slash")
+                            }
+                        }
+                        if planStore.contains(item.id) {
+                            Button(role: .destructive) {
+                                planStore.remove(id: item.id)
+                            } label: {
+                                Label(tr("Remove from Plan to Watch", appLanguage), systemImage: "calendar.badge.minus")
+                            }
+                        }
+                        if progressStore.progress(for: item.id) != nil {
+                            Button(role: .destructive) {
+                                progressStore.remove(id: item.id)
+                            } label: {
+                                Label(tr("Remove from History", appLanguage), systemImage: "trash")
+                            }
+                        }
+                    }
                 }
             }
             .padding(16)
