@@ -1,6 +1,6 @@
 //
 //  ProfileView.swift
-//  SceneBox
+//  MovieStream
 //
 
 import SwiftUI
