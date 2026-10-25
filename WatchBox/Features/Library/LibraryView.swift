@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 // MARK: - Встроенный переводчик
 fileprivate func tr(_ key: String, _ lang: String) -> String {
@@ -20,15 +21,7 @@ fileprivate func tr(_ key: String, _ lang: String) -> String {
         "No history yet": "История пуста",
         "Titles you watch will appear here.": "Здесь появятся просмотренные фильмы и сериалы.",
         "Nothing planned": "Нет планов",
-        "Add titles you want to watch later.": "Добавляйте фильмы и сериалы, которые хотите посмотреть позже.",
-        "Remove": "Удалить",
-        "Remove from Watchlist": "Удалить из Избранного",
-        "Movie": "Фильм",
-        "TV Show": "Сериал",
-        "Anime": "Аниме",
-        "watched": "просмотрено",
-        "episode watched": "эпизод просмотрен",
-        "episodes watched": "эпизодов просмотрено"
+        "Add titles you want to watch later.": "Добавляйте фильмы и сериалы, которые хотите посмотреть позже."
     ]
     return dict[key] ?? key
 }
@@ -86,7 +79,6 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var sectionPicker: some View {
-        // Нативный Apple Segmented Control для всех платформ
         Picker(tr("Section", appLanguage), selection: $section) {
             ForEach(Section.allCases) { option in 
                 Text(tr(option.rawValue, appLanguage)).tag(option) 
@@ -119,44 +111,82 @@ private struct WatchlistSection: View {
 
     var body: some View {
         if watchlist.items.isEmpty {
-            EmptyStateView(
-                systemImage: "bookmark",
-                title: tr("No saved titles", appLanguage),
-                message: tr("Add movies and shows to your Watchlist from their detail pages.", appLanguage)
-            )
+            EmptyStateView(systemImage: "bookmark", title: tr("No saved titles", appLanguage), message: tr("Add movies and shows to your Watchlist from their detail pages.", appLanguage))
         } else {
-            // Здесь отображается список элементов Избранного
-            List {
-                ForEach(watchlist.items) { item in
-                    Text(item.title)
-                }
-            }
+            MediaGridView(items: watchlist.items.map { MediaGridItem(id: $0.id, title: $0.title, poster: $0.posterURLString, type: $0.mediaType) })
         }
     }
 }
 
-// Заглушка для раздела "История"
 private struct HistorySection: View {
     @AppStorage("appLanguage") private var appLanguage = "ru"
+    @Environment(WatchProgressStore.self) private var progressStore
 
     var body: some View {
-        EmptyStateView(
-            systemImage: "clock.arrow.circlepath",
-            title: tr("No history yet", appLanguage),
-            message: tr("Titles you watch will appear here.", appLanguage)
-        )
+        if progressStore.items.isEmpty {
+            EmptyStateView(systemImage: "clock.arrow.circlepath", title: tr("No history yet", appLanguage), message: tr("Titles you watch will appear here.", appLanguage))
+        } else {
+            MediaGridView(items: progressStore.items.map { MediaGridItem(id: $0.id, title: $0.title, poster: $0.posterURLString, type: $0.mediaType) })
+        }
     }
 }
 
-// Заглушка для раздела "Буду смотреть"
 private struct PlanToWatchSection: View {
     @AppStorage("appLanguage") private var appLanguage = "ru"
+    @Environment(PlanToWatchStore.self) private var planStore
 
     var body: some View {
-        EmptyStateView(
-            systemImage: "calendar.badge.clock",
-            title: tr("Nothing planned", appLanguage),
-            message: tr("Add titles you want to watch later.", appLanguage)
-        )
+        if planStore.items.isEmpty {
+            EmptyStateView(systemImage: "calendar.badge.clock", title: tr("Nothing planned", appLanguage), message: tr("Add titles you want to watch later.", appLanguage))
+        } else {
+            MediaGridView(items: planStore.items.map { MediaGridItem(id: $0.id, title: $0.title, poster: $0.posterURLString, type: $0.mediaType) })
+        }
+    }
+}
+
+// Универсальная сетка для отображения контента во вкладках
+private struct MediaGridItem: Identifiable {
+    let id: String
+    let title: String
+    let poster: String?
+    let type: MediaType
+}
+
+private struct MediaGridView: View {
+    let items: [MediaGridItem]
+    
+    let columns = [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 16)]
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 20) {
+                ForEach(items) { item in
+                    NavigationLink(value: MediaNavigation.detail(id: item.id, type: item.type, fallbackTitle: item.title)) {
+                        VStack(alignment: .leading) {
+                            if let posterString = item.poster, let url = URL(string: posterString) {
+                                KFImage(url)
+                                    .resizable()
+                                    .placeholder { Theme.surface }
+                                    .scaledToFill()
+                                    .frame(minWidth: 110, maxWidth: 160, minHeight: 160, maxHeight: 240)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .shadow(radius: 4)
+                            } else {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Theme.surface)
+                                    .frame(minWidth: 110, maxWidth: 160, minHeight: 160, maxHeight: 240)
+                                    .overlay(Text(item.title).font(.caption).multilineTextAlignment(.center).padding())
+                            }
+                            Text(item.title)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(2)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(16)
+        }
     }
 }
