@@ -15,6 +15,9 @@ struct WatchBoxApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     #endif
 
+    // Подтягиваем выбранную тему из настроек (сохраняется в ProfileView)
+    @AppStorage("themeMode") private var themeMode = "Auto"
+
     init() {
         Self.configureImageCache()
 
@@ -39,6 +42,17 @@ struct WatchBoxApp: App {
         WindowGroup {
             RootView()
                 .onOpenURL { DeepLinkRouter.shared.handle($0) }
+                // Динамически применяем тему в зависимости от выбора в Профиле
+                .preferredColorScheme(colorScheme)
+        }
+    }
+
+    // Мапим строковое значение темы в системный ColorScheme?
+    private var colorScheme: ColorScheme? {
+        switch themeMode {
+        case "Light": return .light
+        case "Dark": return .dark
+        default: return nil // "Auto" — системная тема (автоматически день/ночь)
         }
     }
 }
