@@ -46,7 +46,23 @@ final class MediaDetailModel {
         self.type = type
         let settings = settings ?? .shared
         self.settings = settings
-        self.search = TorrentSearch(sourceBases: settings.streamSourceBases)
+        
+        // Используем TMDB Addon как основной источник для обхода блокировок Cloudflare/VPN
+        let tmdbAddon = "https://94c8cb9f702d-tmdb-addon.baby-beamup.club"
+        let cinemeta = "https://v3-cinemeta.strem.io"
+        
+        var sources = settings.streamSourceBases
+        
+        // Убираем старую Cinemeta, чтобы она не вызывала ошибку формата при блоке
+        sources.removeAll(where: { $0.contains("cinemeta") })
+        // Ставим TMDB первым в очереди
+        if !sources.contains(tmdbAddon) {
+            sources.insert(tmdbAddon, at: 0)
+        }
+        // Возвращаем Cinemeta в самый конец как запасной вариант
+        sources.append(cinemeta)
+        
+        self.search = TorrentSearch(sourceBases: sources)
     }
 
     deinit {
@@ -93,7 +109,13 @@ final class MediaDetailModel {
                 _ = await (cast, related)
             } catch {
                 guard !Task.isCancelled else { return }
-                errorMessage = error.localizedDescription
+                // Системная ошибка + пояснение причины (Cloudflare/VPN) на двух языках
+                errorMessage = """
+                \(error.localizedDescription)
+                
+                🇬🇧 EN: Failed to load data. The catalog server might be blocking your IP/VPN with a Cloudflare CAPTCHA, causing a format error. Try turning off your VPN or switching the server.
+                🇷🇺 RU: Не удалось загрузить данные. Сервер каталога может блокировать ваш IP/VPN защитой Cloudflare (выдавая капчу вместо данных), что вызывает ошибку формата. Попробуйте отключить VPN или сменить сервер.
+                """
             }
             isLoading = false
         }
@@ -172,8 +194,6 @@ final class MediaDetailModel {
         isLoadingReleases = false
     }
 
-    /// What to try, in order, if `stream` doesn't start: the next best
-    /// sources that still have seeders.
     func fallbacks(after stream: TorrentStream, limit: Int = 3) -> [TorrentStream] {
         Array(releases
             .filter { $0.id != stream.id && !$0.isDebrid && (assessments[$0.id]?.isPlayable ?? true) }
@@ -184,8 +204,6 @@ final class MediaDetailModel {
         await rankedStreams(for: episode).first
     }
 
-    /// The best sources to try in order (auto-pick and batch downloads): the
-    /// one that played last time if it still has seeders, then by live health.
     func rankedStreams(for episode: Episode?, limit: Int = 4) async -> [TorrentStream] {
         let found = (try? await search.streams(
             id: mediaID, type: type,
@@ -200,9 +218,6 @@ final class MediaDetailModel {
         return Array(ordered.prefix(limit))
     }
 
-    /// Asks the trackers who is sharing each source right now (about a
-    /// quarter of a second, 2.5 s at most), then orders them by what will
-    /// start and keep playing best.
     private func rank(_ streams: [TorrentStream]) async
         -> (streams: [TorrentStream], assessments: [String: SourceRanking.Assessment]) {
         var seen = Set<String>()
