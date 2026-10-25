@@ -16,7 +16,6 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // ВЕРНУЛИ НАДЕЖНЫЙ СЕРВЕР ДЛЯ КАТАЛОГОВ (Главная страница работает без сбоев)
         let base = isAnime ? kitsuBase : "https://v3-cinemeta.strem.io"
         
         var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feed.rawValue)"
@@ -38,15 +37,21 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        // ОСТАВИЛИ /ru ТОЛЬКО ДЛЯ КАРТОЧЕК ФИЛЬМОВ (чтобы описание было на русском)
-        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io/ru"
+        // УБРАЛИ /ru: базовая ссылка должна быть чистой, иначе сервер отдает ошибку 404 (HTML вместо JSON)
+        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
         guard let url = URL(string: "\(base)/meta/\(typePath)/\(safeID).json") else {
             throw CatalogError.badURL
         }
-        let (data, _) = try await URLSession.shared.data(for: Self.request(url))
+        
+        let (data, response) = try await URLSession.shared.data(for: Self.request(url))
+        
+        // Проверяем, не заблокировал ли нас сервер (Cloudflare / 404)
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+            throw CatalogError.formatError("Ошибка сервера \(httpResponse.statusCode). Проверьте VPN.")
+        }
         
         do {
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -55,7 +60,6 @@ extension TorrentSearch {
             }
             return Self.parseDetail(meta, fallbackType: type)
         } catch {
-            // Если JSON не парсится, кидаем четкую ошибку формата
             throw CatalogError.formatError("Сервер вернул данные в неожиданном формате.")
         }
     }
@@ -173,7 +177,6 @@ extension TorrentSearch {
         }
     }
 
-    // ИСПРАВЛЕНИЕ: Поддержка простых дат (yyyy-MM-dd) в дополнение к ISO8601
     private static func parseDate(_ text: String) -> Date? {
         if let isoDate = ISO8601DateFormatter().date(from: text) {
             return isoDate
@@ -190,7 +193,7 @@ extension TorrentSearch {
 nonisolated public enum CatalogError: Error, LocalizedError {
     case notFound(String)
     case badURL
-    case formatError(String) // Новая ошибка формата для точного отлова
+    case formatError(String)
 
     public var errorDescription: String? {
         switch self {
