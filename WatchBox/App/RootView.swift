@@ -59,6 +59,7 @@ struct RootView: View {
             guard let profileID else { return }
             WatchProgressStore.shared.use(LocalWatchProgressBackend(profileID: profileID))
             WatchlistStore.shared.use(LocalWatchlistBackend(profileID: profileID))
+            PlanToWatchStore.shared.use(LocalPlanToWatchBackend(profileID: profileID)) // НОВОЕ: Поддержка профилей для "Буду смотреть"
         }
     }
 
