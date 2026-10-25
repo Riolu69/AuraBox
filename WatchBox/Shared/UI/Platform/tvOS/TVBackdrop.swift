@@ -47,7 +47,7 @@ struct TVTitleArt: View {
     private var text: some View {
         Text(title)
             .font(.system(size: titleSize, weight: .bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary) // Заменили жесткий белый на адаптивный цвет системы
             .lineLimit(2)
             .minimumScaleFactor(0.6)
     }
