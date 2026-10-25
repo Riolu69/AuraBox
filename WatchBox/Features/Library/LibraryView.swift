@@ -151,7 +151,7 @@ private struct MediaGridItem: Identifiable {
     let poster: String?
     let type: MediaType
     
-    // ИСПРАВЛЕНИЕ: Генерируем MediaResult для правильной навигации
+    // Генерируем MediaResult для правильной навигации
     var result: MediaResult {
         MediaResult(id: id, type: type, name: title, year: nil, posterURL: poster.flatMap(URL.init(string:)), description: nil)
     }
