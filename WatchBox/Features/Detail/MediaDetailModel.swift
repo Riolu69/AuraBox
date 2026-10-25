@@ -19,7 +19,7 @@ fileprivate func tr(_ key: String) -> String {
         "Finding sources…": "Поиск источников…",
         "Checking which are alive…": "Проверка доступности…",
         "No sources available for this title.": "Нет доступных источников для этого видео.",
-        "Failed to load data. The catalog server might be blocking your IP/VPN with a Cloudflare CAPTCHA, causing a format error. Try turning off your VPN or switching the server.": "Не удалось загрузить данные. Сервер каталога может блокировать ваш IP/VPN защитой Cloudflare (выдавая капчу вместо данных), что вызывает ошибку формата. Попробуйте отключить VPN или сменить сервер."
+        "Failed to load data. The catalog server might be blocking your IP/VPN with a Cloudflare CAPTCHA, causing a format error. Try turning off your VPN or switching the server.": "Не удалось загрузить данные. Проверьте соединение или отключите VPN."
     ]
     return dict[key] ?? key
 }
@@ -44,10 +44,8 @@ final class MediaDetailModel {
 
     var releaseRequest: ReleaseRequest?
     private(set) var releases: [TorrentStream] = []
-    /// How each source looks right now (live seeders, weight), by source id.
     private(set) var assessments: [String: SourceRanking.Assessment] = [:]
     private(set) var isLoadingReleases = false
-    /// "Finding sources…", then "Checking which are alive…".
     private(set) var releaseStage = tr("Finding sources…")
     private(set) var releaseError: String?
 
@@ -62,20 +60,12 @@ final class MediaDetailModel {
         let settings = settings ?? .shared
         self.settings = settings
         
-        // Используем TMDB Addon как основной источник для обхода блокировок Cloudflare/VPN
-        let tmdbAddon = "https://94c8cb9f702d-tmdb-addon.baby-beamup.club"
-        let cinemeta = "https://v3-cinemeta.strem.io"
-        
+        // Возвращаем оригинальный и надежный Stremio (Cinemeta) как основной источник
+        let defaultCinemeta = "https://v3-cinemeta.strem.io"
         var sources = settings.streamSourceBases
-        
-        // Убираем старую Cinemeta, чтобы она не вызывала ошибку формата при блоке
-        sources.removeAll(where: { $0.contains("cinemeta") })
-        // Ставим TMDB первым в очереди
-        if !sources.contains(tmdbAddon) {
-            sources.insert(tmdbAddon, at: 0)
+        if !sources.contains(where: { $0.contains("cinemeta") }) {
+            sources.insert(defaultCinemeta, at: 0)
         }
-        // Возвращаем Cinemeta в самый конец как запасной вариант
-        sources.append(cinemeta)
         
         self.search = TorrentSearch(sourceBases: sources)
     }
@@ -124,12 +114,7 @@ final class MediaDetailModel {
                 _ = await (cast, related)
             } catch {
                 guard !Task.isCancelled else { return }
-                // Транслируем системную ошибку напрямую в UI + наш перевод
-                errorMessage = """
-                \(error.localizedDescription)
-                
-                \(tr("Failed to load data. The catalog server might be blocking your IP/VPN with a Cloudflare CAPTCHA, causing a format error. Try turning off your VPN or switching the server."))
-                """
+                errorMessage = "\(error.localizedDescription)"
             }
             isLoading = false
         }
@@ -224,7 +209,7 @@ final class MediaDetailModel {
             season: episode?.season, episode: episode?.episode)) ?? []
         let ranked = await rank(found)
         var ordered = ranked.streams.filter { ranked.assessments[$0.id]?.isPlayable ?? true }
-        if ordered.isEmpty { ordered = ranked.streams }      // all quiet: still try the best
+        if ordered.isEmpty { ordered = ranked.streams }
         if let last = SourceMemory.last(mediaID: mediaID, season: episode?.season, episode: episode?.episode),
            let index = ordered.firstIndex(where: { SourceKey.make($0) == last.sourceKey }) {
             ordered.insert(ordered.remove(at: index), at: 0)
