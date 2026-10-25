@@ -26,13 +26,14 @@ struct TVDetailView: View {
 
     @Environment(DownloadStore.self) private var downloads
     @Environment(WatchlistStore.self) private var watchlist
+    @Environment(PlanToWatchStore.self) private var planStore // Подключаем хранилище планов
     @FocusState private var focus: Focusable?
     @State private var shelf: Shelf = .episodes
     @State private var showingSynopsis = false
     @FocusState private var focusedEpisodeID: String?
     @State private var detailEpisode: Episode?
 
-    private enum Focusable: Hashable { case watch, download, watchlist, synopsis }
+    private enum Focusable: Hashable { case watch, download, watchlist, plantowatch, synopsis }
     private enum Shelf: Hashable { case episodes, cast, similar }
 
     private static let edge: CGFloat = 90
@@ -287,6 +288,21 @@ struct TVDetailView: View {
             }
             .buttonStyle(TVAccentButtonStyle(selected: isSaved))
             .focused($focus, equals: .watchlist)
+
+            // НОВАЯ КНОПКА "БУДУ СМОТРЕТЬ" (Для TV)
+            let isPlanned = planStore.contains(detail.id)
+            Button {
+                planStore.toggle(id: detail.id, mediaType: detail.type,
+                                 title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                 posterURL: detail.posterURL)
+            } label: {
+                Label(isPlanned ? "Planned" : "Plan to Watch",
+                      systemImage: isPlanned ? "calendar.badge.clock" : "calendar")
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .buttonStyle(TVAccentButtonStyle(selected: isPlanned))
+            .focused($focus, equals: .plantowatch)
         }
         .fixedSize()
         .disabled(isBusy)
@@ -411,12 +427,12 @@ struct TVDetailView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)   // room for the focus lift
+                .padding(.horizontal, 20)
                 .padding(.vertical, 18)
             }
             .padding(.horizontal, -20)
             .scrollClipDisabled()
-            .id(selectedSeason)         // fresh row (and scroll offset) per season
+            .id(selectedSeason)
         }
     }
 
