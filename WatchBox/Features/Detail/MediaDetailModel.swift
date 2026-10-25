@@ -9,6 +9,21 @@ import Foundation
 import Observation
 import Kingfisher
 
+// MARK: - Встроенный переводчик для Модели
+fileprivate func tr(_ key: String) -> String {
+    let lang = UserDefaults.standard.string(forKey: "appLanguage") ?? "ru"
+    guard lang == "ru" else { return key }
+    let dict: [String: String] = [
+        "Choose a release to stream": "Выберите источник для просмотра",
+        "Choose a release to download": "Выберите источник для скачивания",
+        "Finding sources…": "Поиск источников…",
+        "Checking which are alive…": "Проверка доступности…",
+        "No sources available for this title.": "Нет доступных источников для этого видео.",
+        "Failed to load data. The catalog server might be blocking your IP/VPN with a Cloudflare CAPTCHA, causing a format error. Try turning off your VPN or switching the server.": "Не удалось загрузить данные. Сервер каталога может блокировать ваш IP/VPN защитой Cloudflare (выдавая капчу вместо данных), что вызывает ошибку формата. Попробуйте отключить VPN или сменить сервер."
+    ]
+    return dict[key] ?? key
+}
+
 @MainActor
 @Observable
 final class MediaDetailModel {
@@ -33,7 +48,7 @@ final class MediaDetailModel {
     private(set) var assessments: [String: SourceRanking.Assessment] = [:]
     private(set) var isLoadingReleases = false
     /// "Finding sources…", then "Checking which are alive…".
-    private(set) var releaseStage = "Finding sources…"
+    private(set) var releaseStage = tr("Finding sources…")
     private(set) var releaseError: String?
 
     @ObservationIgnored private var search: TorrentSearch
@@ -80,8 +95,8 @@ final class MediaDetailModel {
 
         var title: String {
             switch intent {
-            case .watch: "Choose a release to stream"
-            case .download: "Choose a release to download"
+            case .watch: return tr("Choose a release to stream")
+            case .download: return tr("Choose a release to download")
             }
         }
     }
@@ -109,12 +124,11 @@ final class MediaDetailModel {
                 _ = await (cast, related)
             } catch {
                 guard !Task.isCancelled else { return }
-                // Системная ошибка + пояснение причины (Cloudflare/VPN) на двух языках
+                // Транслируем системную ошибку напрямую в UI + наш перевод
                 errorMessage = """
                 \(error.localizedDescription)
                 
-                🇬🇧 EN: Failed to load data. The catalog server might be blocking your IP/VPN with a Cloudflare CAPTCHA, causing a format error. Try turning off your VPN or switching the server.
-                🇷🇺 RU: Не удалось загрузить данные. Сервер каталога может блокировать ваш IP/VPN защитой Cloudflare (выдавая капчу вместо данных), что вызывает ошибку формата. Попробуйте отключить VPN или сменить сервер.
+                \(tr("Failed to load data. The catalog server might be blocking your IP/VPN with a Cloudflare CAPTCHA, causing a format error. Try turning off your VPN or switching the server."))
                 """
             }
             isLoading = false
@@ -161,7 +175,7 @@ final class MediaDetailModel {
         releases = []
         assessments = [:]
         releaseError = nil
-        releaseStage = "Finding sources…"
+        releaseStage = tr("Finding sources…")
         isLoadingReleases = true
 
         releaseTask = Task { [mediaID, type, search] in
@@ -171,12 +185,12 @@ final class MediaDetailModel {
                     season: episode?.season, episode: episode?.episode)
                 guard !Task.isCancelled else { return }
 
-                releaseStage = "Checking which are alive…"
+                releaseStage = tr("Checking which are alive…")
                 let ranked = await rank(found)
                 guard !Task.isCancelled else { return }
                 releases = ranked.streams
                 assessments = ranked.assessments
-                releaseError = releases.isEmpty ? "No sources available for this title." : nil
+                releaseError = releases.isEmpty ? tr("No sources available for this title.") : nil
             } catch {
                 guard !Task.isCancelled else { return }
                 releaseError = error.localizedDescription
