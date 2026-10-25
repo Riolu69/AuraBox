@@ -2,8 +2,6 @@
 //  TVHomeView.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 19.08.26.
-//
 
 #if os(tvOS)
 import SwiftUI
@@ -43,9 +41,10 @@ struct TVHomeView: View {
 
     private var shelves: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 32) {
                 if let featured = model.featured {
                     TVSpotlight(item: featured, detail: model.featuredDetail)
+                        .padding(.bottom, 12)
                 }
                 if !progress.continueItems.isEmpty {
                     TVContinueWatchingShelf(items: progress.continueItems)
@@ -85,11 +84,13 @@ private struct TVSpotlight: View {
         ZStack(alignment: .bottomLeading) {
             TVBackdropImage(url: backdropURL)
 
-            LinearGradient(colors: [.black.opacity(0.85), .black.opacity(0.2), .clear],
+            // Нативные градиенты Apple TV (мягкое затемнение для читаемости текста)
+            LinearGradient(colors: [Theme.background.opacity(0.9), Theme.background.opacity(0.3), .clear],
                            startPoint: .leading, endPoint: .trailing)
+            
             LinearGradient(stops: [
-                .init(color: .clear, location: 0.4),
-                .init(color: Theme.background.opacity(0.6), location: 0.85),
+                .init(color: .clear, location: 0.5),
+                .init(color: Theme.background.opacity(0.7), location: 0.85),
                 .init(color: Theme.background, location: 1.0),
             ], startPoint: .top, endPoint: .bottom)
 
@@ -107,25 +108,26 @@ private struct TVSpotlight: View {
         VStack(alignment: .leading, spacing: 16) {
             TVTitleArt(logoURL: detail?.logoURL, title: item.name,
                        maxLogoWidth: 620, maxLogoHeight: 200, titleSize: 62)
+                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
 
             Text(metaLine)
-                .font(.title3)
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.headline)
+                .foregroundStyle(.secondary) // Системный цвет Apple
 
             if let overview = detail?.description ?? item.description, !overview.isEmpty {
                 Text(overview)
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .font(.body)
+                    .foregroundStyle(.primary.opacity(0.85)) // Системный цвет
                     .lineLimit(3)
-                    .lineSpacing(4)
+                    .lineSpacing(6)
                     .frame(maxWidth: 820, alignment: .leading)
             }
 
             NavigationLink(value: item) {
-                Label("View Details", systemImage: "info.circle")
+                Label("View Details", systemImage: "info.circle.fill") // Залитая иконка смотрится лучше на tvOS
             }
             .buttonStyle(TVAccentButtonStyle())
-            .padding(.top, 10)
+            .padding(.top, 12)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
