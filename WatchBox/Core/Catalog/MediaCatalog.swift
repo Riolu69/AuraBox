@@ -16,21 +16,10 @@ extension TorrentSearch {
     ) async throws -> [MediaResult] {
         let isAnime = type == .anime
         
-        // TMDB для Главного экрана (переведенные постеры и названия)
-        let base = isAnime ? kitsuBase : "https://tmdb.strem.fun/ru"
+        // ВЕРНУЛИ НАДЕЖНЫЙ СЕРВЕР ДЛЯ КАТАЛОГОВ (Главная страница работает без сбоев)
+        let base = isAnime ? kitsuBase : "https://v3-cinemeta.strem.io"
         
-        var feedId = feed.rawValue
-        if !isAnime {
-            switch feedId {
-            case "top", "popular": feedId = "tmdb.popular"
-            case "imdbRating", "top_rated": feedId = "tmdb.top"
-            case "trending": feedId = "tmdb.trending"
-            case "new", "year": feedId = "tmdb.new"
-            default: feedId = "tmdb.popular"
-            }
-        }
-        
-        var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feedId)"
+        var path = "catalog/\(isAnime ? "anime" : type.rawValue)/\(isAnime ? feed.kitsuCatalog : feed.rawValue)"
         var extras: [String] = []
         if let genre, !genre.isEmpty {
             let encoded = genre.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? genre
@@ -49,9 +38,8 @@ extension TorrentSearch {
     public func detail(id: String, type: MediaType) async throws -> MediaDetail {
         let isKitsu = id.hasPrefix("kitsu:")
         
-        // ИСПРАВЛЕНИЕ: Теперь и карточка фильма берется из TMDB, 
-        // чтобы не было ошибки "нет интернета" и всё было на русском!
-        let base = isKitsu ? kitsuBase : "https://tmdb.strem.fun/ru"
+        // ОСТАВИЛИ /ru ТОЛЬКО ДЛЯ КАРТОЧЕК ФИЛЬМОВ (чтобы описание было на русском)
+        let base = isKitsu ? kitsuBase : "https://v3-cinemeta.strem.io/ru"
         
         let typePath = isKitsu ? "anime" : type.rawValue
         let safeID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
