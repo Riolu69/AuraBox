@@ -1,6 +1,6 @@
 //
 //  ProfileView.swift
-//  SceneBox
+//  MovieStream
 //
 
 import SwiftUI
@@ -19,7 +19,8 @@ fileprivate func tr(_ key: String, _ lang: String) -> String {
         "System": "Авто",
         "Light": "Светлое",
         "Dark": "Темное",
-        "Support the developer": "Поддержать разработчика",
+        "Support the developer": "Поддержать разработчика (Сбербанк)",
+        "Card number copied!": "Номер карты скопирован!",
         "Stream quality": "Качество видео",
         "Sort releases by": "Сортировка",
         "Prefer resolution": "Предпочтительное разрешение",
@@ -100,6 +101,7 @@ struct ProfileView: View {
     @State private var confirmClearDownloads = false
     @State private var confirmClearStreamCache = false
     @State private var streamCacheBytes: Int64 = 0
+    @State private var toast: ToastMessage?
 
     var body: some View {
         @Bindable var settings = settings
@@ -141,18 +143,25 @@ struct ProfileView: View {
                         }
                         .pickerStyle(.segmented)
                         
+                        // Кнопка копирования карты Сбербанка
                         Button(action: {
-                            if let url = URL(string: "https://boosty.to/ВАША_ССЫЛКА") {
-                                UIApplication.shared.open(url)
-                            }
+                            let cardNumber = "4276 6700 3253 5758"
+                            #if os(iOS)
+                            UIPasteboard.general.string = cardNumber
+                            #elseif os(macOS)
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(cardNumber, forType: .string)
+                            #endif
+                            
+                            toast = ToastMessage(text: tr("Card number copied!", appLanguage), systemImage: "doc.on.doc.fill")
                         }) {
                             HStack(spacing: 12) {
-                                Image(systemName: "heart.fill")
-                                    .foregroundStyle(.pink)
+                                Image(systemName: "creditcard.fill")
+                                    .foregroundStyle(.green)
                                 Text(tr("Support the developer", appLanguage))
                                     .foregroundStyle(.primary)
                                 Spacer()
-                                Image(systemName: "arrow.up.right")
+                                Image(systemName: "doc.on.clipboard")
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(.tertiary)
                             }
@@ -411,6 +420,7 @@ struct ProfileView: View {
             .toolbar(.hidden, for: .navigationBar)
             .statusBarScrim()
             #endif
+            .toast($toast)
             .task {
                 downloads.refreshDiskUsage()
                 await refreshStreamCacheSize()
