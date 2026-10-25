@@ -14,7 +14,7 @@
 
 /* Begin PBXFileReference section */
 		D71B70E0D71B70E0D71B7001 /* LibTorrentEngine.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibTorrentEngine.xcframework; path = LibTorrent/LibTorrentEngine.xcframework; sourceTree = "<group>"; };
-		F6AB251C301960180062F7C8 /* SceneBox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SceneBox.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F6AB251C301960180062F7C8 /* Aura.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aura.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -64,7 +64,7 @@
 		F6AB251D301960180062F7C8 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F6AB251C301960180062F7C8 /* SceneBox.app */,
+				F6AB251C301960180062F7C8 /* Aura.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,7 +93,7 @@
 				F6AB257930197C7F0062F7C8 /* Kingfisher */,
 			);
 			productName = WatchBox;
-			productReference = F6AB251C301960180062F7C8 /* SceneBox.app */;
+			productReference = F6AB251C301960180062F7C8 /* Aura.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -301,9 +301,9 @@
 					"$(SRCROOT)/LibTorrent/LibTorrentEngine/include",
 				);
 				INFOPLIST_FILE = WatchBox/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SceneBox;
+				INFOPLIST_KEY_CFBundleDisplayName = Aura;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "SceneBox finds TVs and players on your Wi-Fi to play what you're watching on them, and connects to peers to stream and download.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Aura finds TVs and players on your Wi-Fi to play what you're watching on them, and connects to peers to stream and download.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -323,9 +323,9 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.scenebox.SceneBox;
-				PRODUCT_MODULE_NAME = WatchBox;
-				PRODUCT_NAME = SceneBox;
+				PRODUCT_BUNDLE_IDENTIFIER = app.aura.Aura;
+				PRODUCT_MODULE_NAME = AuraBox;
+				PRODUCT_NAME = Aura;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = YES;
@@ -366,9 +366,9 @@
 					"$(SRCROOT)/LibTorrent/LibTorrentEngine/include",
 				);
 				INFOPLIST_FILE = WatchBox/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SceneBox;
+				INFOPLIST_KEY_CFBundleDisplayName = Aura;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "SceneBox finds TVs and players on your Wi-Fi to play what you're watching on them, and connects to peers to stream and download.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Aura finds TVs and players on your Wi-Fi to play what you're watching on them, and connects to peers to stream and download.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -388,9 +388,9 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.scenebox.SceneBox;
-				PRODUCT_MODULE_NAME = WatchBox;
-				PRODUCT_NAME = SceneBox;
+				PRODUCT_BUNDLE_IDENTIFIER = app.aura.Aura;
+				PRODUCT_MODULE_NAME = AuraBox;
+				PRODUCT_NAME = Aura;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = YES;
