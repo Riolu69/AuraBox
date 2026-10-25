@@ -17,6 +17,9 @@ struct WatchBoxApp: App {
 
     // Подтягиваем выбранную тему из настроек (сохраняется в ProfileView)
     @AppStorage("themeMode") private var themeMode = "Auto"
+    
+    // 1. Создаем переменную для нашего хранилища
+    @State private var planStore = PlanToWatchStore.shared
 
     init() {
         Self.configureImageCache()
@@ -44,6 +47,8 @@ struct WatchBoxApp: App {
                 .onOpenURL { DeepLinkRouter.shared.handle($0) }
                 // Динамически применяем тему в зависимости от выбора в Профиле
                 .preferredColorScheme(colorScheme)
+                // 2. Передаем хранилище "Буду смотреть" всем экранам приложения
+                .environment(planStore)
         }
     }
 
