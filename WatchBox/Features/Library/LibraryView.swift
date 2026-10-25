@@ -79,7 +79,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var sectionPicker: some View {
         // Нативный Apple Segmented Control для всех платформ
-        Picker(tr("Section", appLanguage), selection: \$section) {
+        Picker(tr("Section", appLanguage), selection: $section) {
             ForEach(Section.allCases) { option in 
                 Text(tr(option.rawValue, appLanguage)).tag(option) 
             }
@@ -112,4 +112,15 @@ private struct WatchlistSection: View {
             EmptyStateView(
                 systemImage: "bookmark",
                 title: tr("No saved titles", appLanguage),
-                message
+                message: tr("Add movies and shows to your Watchlist from their detail pages.", appLanguage)
+            )
+        } else {
+            // Здесь отображается список элементов Избранного
+            List {
+                ForEach(watchlist.items) { item in
+                    Text(item.title)
+                }
+            }
+        }
+    }
+}
