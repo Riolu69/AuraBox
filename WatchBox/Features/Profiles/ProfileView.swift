@@ -400,7 +400,7 @@ struct ProfileView: View {
                     }
 
                     Section {
-                        contactRow(tr("Support", appLanguage), email: "spontaneousarray@gmail.com")
+                        contactRow(tr("Support", appLanguage), email: "rbnfq1121@gmail.com")
                         NavigationLink(tr("Credits", appLanguage)) { CreditsView() }
                     } header: {
                         Text(tr("About", appLanguage))
