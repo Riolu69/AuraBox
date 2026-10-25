@@ -69,7 +69,7 @@ fileprivate func tr(_ key: String, _ lang: String) -> String {
         "Simultaneous downloads": "Одновременные загрузки",
         "Keep downloading in background": "Фоновая загрузка",
         "Show progress in Live Activity": "Показывать прогресс (Live Activity)",
-        "Extra downloads wait in a queue and start automatically. iOS normally freezes an app a few seconds after you leave it, which drops every peer; background mode keeps SceneBox running while downloads are active by playing silent audio that mixes with your music. Smart uses short pulses to save battery; switch to Always-on audio if downloads still stop. Closing SceneBox from the app switcher always stops downloads. The Live Activity shows progress on the Lock Screen, but iOS may mark it failed while a torrent is still looking for peers; downloads carry on regardless.": "Фоновый режим не дает iOS заморозить приложение при сворачивании (используется тихое аудио). Закрытие приложения из меню многозадачности всегда останавливает загрузки.",
+        "Extra downloads wait in a queue and start automatically. iOS normally freezes an app a few seconds after you leave it, which drops every peer; background mode keeps Aura running while downloads are active by playing silent audio that mixes with your music. Smart uses short pulses to save battery; switch to Always-on audio if downloads still stop. Closing Aura from the app switcher always stops downloads. The Live Activity shows progress on the Lock Screen, but iOS may mark it failed while a torrent is still looking for peers; downloads carry on regardless.": "Фоновый режим не дает iOS заморозить приложение при сворачивании (используется тихое аудио). Закрытие приложения из меню многозадачности всегда останавливает загрузки.",
         "Extra downloads wait in a queue and start automatically.": "Дополнительные загрузки ожидают в очереди и запускаются автоматически.",
         "Network": "Сеть",
         "Max peers": "Макс. пиров",
@@ -367,7 +367,7 @@ struct ProfileView: View {
                         Text(tr("Downloads", appLanguage))
                     } footer: {
                         #if os(iOS)
-                        Text(tr("Extra downloads wait in a queue and start automatically. iOS normally freezes an app a few seconds after you leave it, which drops every peer; background mode keeps SceneBox running while downloads are active by playing silent audio that mixes with your music. Smart uses short pulses to save battery; switch to Always-on audio if downloads still stop. Closing SceneBox from the app switcher always stops downloads. The Live Activity shows progress on the Lock Screen, but iOS may mark it failed while a torrent is still looking for peers; downloads carry on regardless.", appLanguage))
+                        Text(tr("Extra downloads wait in a queue and start automatically. iOS normally freezes an app a few seconds after you leave it, which drops every peer; background mode keeps Aura running while downloads are active by playing silent audio that mixes with your music. Smart uses short pulses to save battery; switch to Always-on audio if downloads still stop. Closing Aura from the app switcher always stops downloads. The Live Activity shows progress on the Lock Screen, but iOS may mark it failed while a torrent is still looking for peers; downloads carry on regardless.", appLanguage))
                         #else
                         Text(tr("Extra downloads wait in a queue and start automatically.", appLanguage))
                         #endif
@@ -405,7 +405,7 @@ struct ProfileView: View {
                     } header: {
                         Text(tr("About", appLanguage))
                     } footer: {
-                        Text("SceneBox \(appVersion) (\(buildNumber))")
+                        Text("Aura \(appVersion) (\(buildNumber))")
                     }
                 }
                 .hideScrollBackground()
