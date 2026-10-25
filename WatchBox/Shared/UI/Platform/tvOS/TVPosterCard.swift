@@ -2,8 +2,6 @@
 //  TVPosterCard.swift
 //  SceneBox
 //
-//  Created by SpontaneousArray on 08.08.26.
-//
 
 #if os(tvOS)
 import SwiftUI
@@ -22,10 +20,14 @@ struct TVPosterCard: View {
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(9)
-                        .background(.black.opacity(0.55), in: Circle())
+                        // Меняем глухой черный на фирменное полупрозрачное стекло Apple
+                        .background(.regularMaterial, in: Circle())
+                        .environment(\.colorScheme, .dark)
                         .padding(10)
                 }
             }
+            // Добавляем плавные скругления (continuous) для идеального контура
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .accessibilityLabel(item.name)
     }
 }
