@@ -1,6 +1,6 @@
 //
 //  TVHomeView.swift
-//  SceneBox
+//  Aura
 //
 
 #if os(tvOS)
