@@ -23,7 +23,7 @@ struct TVAccentButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.headline)
-                .foregroundStyle(isFocused || selected ? Theme.onAccent : .white)
+                .foregroundStyle(isFocused || selected ? Theme.onAccent : .primary)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
                 .background(fill, in: Capsule())
@@ -34,7 +34,7 @@ struct TVAccentButtonStyle: ButtonStyle {
 
         private var fill: Color {
             if isFocused { return Theme.accent }
-            return selected ? Theme.accent.opacity(0.85) : .white.opacity(0.12)
+            return selected ? Theme.accent.opacity(0.85) : Theme.surface
         }
     }
 }
@@ -54,9 +54,9 @@ struct TVCircleButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.system(size: diameter * 0.4, weight: .semibold))
-                .foregroundStyle(isFocused ? Color.black : .white.opacity(0.85))
+                .foregroundStyle(isFocused ? Color.black : .primary.opacity(0.85))
                 .frame(width: diameter, height: diameter)
-                .background(isFocused ? Color.white : Color.white.opacity(0.14), in: Circle())
+                .background(isFocused ? Color.primary : Theme.surface, in: Circle())
                 .scaleEffect(isFocused ? 1.05 : 1)
                 .opacity(configuration.isPressed ? 0.7 : 1)
                 .animation(.easeOut(duration: 0.15), value: isFocused)
@@ -78,8 +78,9 @@ struct TVListRowButtonStyle: ButtonStyle {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(isFocused ? Color.white : Color.white.opacity(0.05),
+                .background(isFocused ? Color.primary : Theme.surface,
                             in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .foregroundStyle(isFocused ? Color.black : .primary)
                 .scaleEffect(isFocused ? 1.01 : 1)
                 .opacity(configuration.isPressed ? 0.85 : 1)
                 .animation(.easeOut(duration: 0.15), value: isFocused)
@@ -96,7 +97,7 @@ struct TVFocusRing: View {
     var body: some View {
         let inset = Self.gap + Self.width
         RoundedRectangle(cornerRadius: cornerRadius + inset, style: .continuous)
-            .strokeBorder(.white, lineWidth: Self.width)
+            .strokeBorder(Color.primary, lineWidth: Self.width)
             .padding(-inset)
             .opacity(isFocused ? 1 : 0)
             .animation(.easeOut(duration: 0.18), value: isFocused)
@@ -125,7 +126,7 @@ struct TVPosterButtonStyle: ButtonStyle {
                     if ring { TVFocusRing(cornerRadius: cornerRadius, isFocused: isFocused) }
                 }
                 .scaleEffect(isFocused ? scale : 1)
-                .shadow(color: .black.opacity(isFocused ? 0.55 : 0), radius: 28, y: 14)
+                .shadow(color: .black.opacity(isFocused ? 0.35 : 0), radius: 28, y: 14)
                 .opacity(configuration.isPressed ? 0.8 : 1)
                 .animation(.easeOut(duration: 0.18), value: isFocused)
         }
