@@ -150,6 +150,11 @@ private struct MediaGridItem: Identifiable {
     let title: String
     let poster: String?
     let type: MediaType
+    
+    // ИСПРАВЛЕНИЕ: Генерируем MediaResult для правильной навигации
+    var result: MediaResult {
+        MediaResult(id: id, type: type, name: title, year: nil, posterURL: poster.flatMap(URL.init(string:)), description: nil)
+    }
 }
 
 private struct MediaGridView: View {
@@ -161,7 +166,8 @@ private struct MediaGridView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(items) { item in
-                    NavigationLink(value: MediaNavigation.detail(id: item.id, type: item.type, fallbackTitle: item.title)) {
+                    // ИСПРАВЛЕНИЕ: Передаем MediaResult, как это ожидает приложение
+                    NavigationLink(value: item.result) {
                         VStack(alignment: .leading) {
                             if let posterString = item.poster, let url = URL(string: posterString) {
                                 KFImage(url)
