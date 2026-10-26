@@ -65,13 +65,13 @@ struct LibraryView: View {
                         .padding(.top, 10)
                         .padding(.bottom, 12)
                     
-                    // ИСПРАВЛЕНИЕ: Заставляем контент занимать всё место и прижиматься к верху
+                    // Контент прижимается к верху
                     content
                         .frame(maxHeight: .infinity, alignment: .top)
                 }
                 #endif
             }
-            // ИСПРАВЛЕНИЕ: Прижимаем весь экран к верхнему краю, чтобы он не центрировался
+            // Главный экран прижимается к верху, чтобы не центрировался пустой список
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Theme.background)
             #if os(tvOS)
@@ -151,7 +151,6 @@ private struct PlanToWatchSection: View {
     }
 }
 
-// Универсальная сетка для отображения контента во вкладках
 private struct MediaGridItem: Identifiable {
     let id: String
     let title: String
@@ -166,17 +165,15 @@ private struct MediaGridItem: Identifiable {
 private struct MediaGridView: View {
     let items: [MediaGridItem]
     
-    // Меняем настройки колонок: 2 ровные колонки для iOS, растягивающиеся по ширине
+    // ИСПРАВЛЕНИЕ СЕТКИ ПОСТЕРОВ: Теперь они не огромные, а выстраиваются адаптивно (как в поиске)
     #if os(tvOS)
     let columns = [GridItem(.adaptive(minimum: 200, maximum: 300), spacing: 20)]
     #else
     let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
+        GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 16)
     ]
     #endif
 
-    // Подключаем сторы для возможности удаления
     @AppStorage("appLanguage") private var appLanguage = "ru"
     @Environment(WatchlistStore.self) private var watchlist
     @Environment(WatchProgressStore.self) private var progressStore
@@ -192,7 +189,6 @@ private struct MediaGridView: View {
                                 KFImage(url)
                                     .resizable()
                                     .placeholder { Theme.surface }
-                                    // Растягиваем на всю ширину колонки с сохранением пропорций постера (2:3)
                                     .aspectRatio(2/3, contentMode: .fill)
                                     .frame(maxWidth: .infinity)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -211,7 +207,6 @@ private struct MediaGridView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    // ДОБАВЛЯЕМ КОНТЕКСТНОЕ МЕНЮ С УДАЛЕНИЕМ
                     .contextMenu {
                         if watchlist.contains(item.id) {
                             Button(role: .destructive) {
