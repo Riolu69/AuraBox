@@ -13,7 +13,7 @@ struct HomeView: View {
     @Environment(WatchProgressStore.self) private var progress
     @Environment(WatchlistStore.self) private var watchlist
     
-    // Состояние для отслеживания скролла (чтобы показывать размытие под хедером)
+    // Состояние для отслеживания скролла (чтобы плавно показывать размытие под хедером)
     @State private var scrollOffset: CGFloat = 0
 
     var body: some View {
@@ -32,7 +32,7 @@ struct HomeView: View {
                     feed
                 }
                 
-                // Парящий хедер с эффектом матового стекла при скролле
+                // Фиксированный парящий хедер сверху с эффектом матового стекла
                 floatingHeader
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -60,7 +60,7 @@ struct HomeView: View {
         }
     }
     
-    // НОВОЕ: Красивый парящий хедер
+    // Парящий хедер с динамическим размытием
     private var floatingHeader: some View {
         VStack(spacing: 0) {
             RootHeader(title: "Aura") {
@@ -68,35 +68,36 @@ struct HomeView: View {
                     TabRouter.shared.openSearch()
                 }
             }
-            .padding(.bottom, 8)
+            .padding(.horizontal, 4)
         }
         .background {
-            // Размытие появляется только когда мы прокручиваем страницу вниз
             Rectangle()
                 .fill(.ultraThinMaterial)
-                .opacity(scrollOffset > 50 ? 1 : 0)
-                .ignoresSafeArea()
-                .shadow(color: .black.opacity(0.1), radius: 3, y: 1)
+                .opacity(scrollOffset > 30 ? 1 : 0)
+                .ignoresSafeArea(edges: .top)
+                .shadow(color: .black.opacity(scrollOffset > 30 ? 0.15 : 0), radius: 4, y: 2)
         }
-        .animation(.easeInOut(duration: 0.2), value: scrollOffset > 50)
+        .animation(.easeInOut(duration: 0.2), value: scrollOffset > 30)
     }
 
     private var feed: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                // Отслеживание позиции скролла
+                // Невидимый трекер скролла для определения смещения
                 GeometryReader { geo in
-                    Color.clear.preference(key: ScrollOffsetKey.self, value: -geo.frame(in: .named("scroll")).minY)
+                    Color.clear
+                        .preference(key: ScrollOffsetKey.self, value: -geo.frame(in: .named("scroll")).minY)
                 }
                 .frame(height: 0)
                 
                 LazyVStack(alignment: .leading, spacing: Platform.isMac ? 34 : 28) {
                     if !featured.isEmpty {
-                        // Карусель новинок теперь на самом верху и без отступов
+                        // Карусель новинок с учетом верхнего отступа под хедер
                         FeaturedMarquee(items: featured)
+                            .padding(.top, 60) // Запас под шапку приложения
                             .padding(.bottom, 12)
                     } else {
-                        Color.clear.frame(height: 100) // Отступ под хедер, если нет новинок
+                        Color.clear.frame(height: 100)
                     }
                     
                     if !progress.continueItems.isEmpty {
@@ -131,7 +132,6 @@ struct HomeView: View {
             .onPreferenceChange(ScrollOffsetKey.self) { value in
                 scrollOffset = value
             }
-            .ignoresSafeArea(edges: .top) // Главный секрет: контент уходит под челку
             .refreshable {
                 progress.refresh()
                 async let catalog: () = model.refresh()
@@ -185,15 +185,15 @@ private struct FeaturedMarquee: View {
     var body: some View {
         VStack(spacing: 16) {
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 0) { // Убрали отступы между карточками для эффекта кино
+                LazyHStack(spacing: 0) {
                     ForEach(items) { item in
                         PosterLink(item: item) {
                             FeaturedCard(item: item)
                         }
-                        .overlay(alignment: .topTrailing) { 
+                        .overlay(alignment: .topTrailing) {
                             FeaturedWatchlistButton(item: item)
-                                .padding(.top, 60) // Сдвигаем кнопку ниже безопасной зоны хедера
-                                .padding(.trailing, 16)
+                                .padding(.top, 16)
+                                .padding(.trailing, 20)
                         }
                         .containerRelativeFrame(.horizontal)
                         .scrollTransition(axis: .horizontal) { content, phase in
@@ -206,9 +206,8 @@ private struct FeaturedMarquee: View {
                 }
                 .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.paging) // Пейджинг вместо выравнивания
+            .scrollTargetBehavior(.paging)
             .scrollPosition(id: $current)
-            .ignoresSafeArea(edges: .top)
 
             if items.count > 1 {
                 PageDots(count: items.count,
@@ -224,10 +223,10 @@ private struct FeaturedCard: View {
 
     var body: some View {
         Color.clear
-            .aspectRatio(0.85, contentMode: .fill) // Более высокий формат как у постеров в кино
+            .aspectRatio(1.35, contentMode: .fit) // Сбалансированный кинематографичный формат баннера
             .background {
                 KFImage(item.backdropURL)
-                    .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 1200, height: 1200)))
+                    .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 1200, height: 900)))
                     .cacheOriginalImage()
                     .cancelOnDisappear(true)
                     .fade(duration: 0.4)
@@ -236,10 +235,9 @@ private struct FeaturedCard: View {
                     .scaledToFill()
             }
             .overlay {
-                // Плавный и глубокий градиент, сливающийся с фоном приложения
                 LinearGradient(stops: [
-                    .init(color: Theme.background.opacity(0), location: 0.4),
-                    .init(color: Theme.background.opacity(0.6), location: 0.75),
+                    .init(color: Theme.background.opacity(0), location: 0.3),
+                    .init(color: Theme.background.opacity(0.7), location: 0.75),
                     .init(color: Theme.background, location: 1.0)
                 ], startPoint: .top, endPoint: .bottom)
             }
@@ -250,7 +248,7 @@ private struct FeaturedCard: View {
     }
 
     private var caption: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             if let logo = item.logoURL {
                 KFImage(logo)
                     .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 600, height: 240)))
@@ -258,14 +256,14 @@ private struct FeaturedCard: View {
                     .placeholder { titleText }
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: 240, maxHeight: 85, alignment: .bottomLeading)
-                    .shadow(color: .black.opacity(0.8), radius: 10, x: 0, y: 4)
+                    .frame(maxWidth: 220, maxHeight: 75, alignment: .bottomLeading)
+                    .shadow(color: .black.opacity(0.8), radius: 8, x: 0, y: 3)
             } else {
                 titleText
             }
             
             HStack(spacing: 12) {
-                if let year = item.year { 
+                if let year = item.year {
                     Text(year)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -283,16 +281,16 @@ private struct FeaturedCard: View {
             .foregroundStyle(.white.opacity(0.95))
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 10)
+        .padding(.bottom, 12)
     }
 
     private var titleText: some View {
         Text(item.name)
-            .font(.system(size: 40, weight: .heavy, design: .rounded))
+            .font(.system(size: 34, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
             .lineLimit(2)
             .minimumScaleFactor(0.7)
-            .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.6), radius: 6, x: 0, y: 2)
     }
 }
 
@@ -309,9 +307,9 @@ private struct FeaturedWatchlistButton: View {
         } label: {
             Image(systemName: saved ? "checkmark" : "plus")
                 .font(.title3.weight(.bold))
-                .foregroundStyle(saved ? .white : .white)
+                .foregroundStyle(.white)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 44, height: 44)
+                .frame(width: 40, height: 40)
                 .background(saved ? Theme.accent : Color.black.opacity(0.4), in: Circle())
                 .background(.ultraThinMaterial, in: Circle())
         }
@@ -374,7 +372,7 @@ private struct PosterShelf: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 10) // Пространство для красивых теней карточек
+                .padding(.vertical, 10)
             }
         }
     }
@@ -392,13 +390,13 @@ private struct RankedCard: View {
             Text(String(rank))
                 .font(.display(size, weight: .black))
                 .foregroundStyle(.linearGradient(colors: [.primary.opacity(0.9), .primary.opacity(0.2)],
-                                                 startPoint: .top, endPoint: .bottom))
+                                               startPoint: .top, endPoint: .bottom))
                 .fixedSize()
                 .padding(.top, metrics.capHeight - metrics.ascender)
                 .padding(.bottom, metrics.descender)
             PosterCard(item: item)
                 .frame(width: width)
-                .shadow(color: Color.black.opacity(0.2), radius: 10, x: -4, y: 5) // Премиальная глубокая тень
+                .shadow(color: Color.black.opacity(0.2), radius: 10, x: -4, y: 5)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Number \(rank), \(item.name)")
