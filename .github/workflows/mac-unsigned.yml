@@ -12,6 +12,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Clean previous build artifacts and cache
+        run: |
+          rm -rf build_output
+          rm -rf ~/Library/Caches/org.swift.swift-package-manager
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+
       - name: Resolve and Patch SwiftVLC dependencies
         run: |
           echo "Resolving package dependencies..."
