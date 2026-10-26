@@ -1,5 +1,4 @@
-
-# Builds an unsigned SceneBox.ipa on a GitHub-hosted Mac, so no local Mac or
+# Builds an unsigned Aura.ipa on a GitHub-hosted Mac, so no local Mac or
 # Xcode is needed. Sideloadly / AltStore / SideStore / TrollStore sign it on
 # install, exactly like the IPA from the original project.
 #
@@ -111,7 +110,7 @@ jobs:
           cp -R "$APP" out/Payload/
           find out/Payload -name "_CodeSignature" -type d -prune -exec rm -rf {} +
           find out/Payload -name "embedded.mobileprovision" -delete
-          IPA="SceneBox-${VERSION}-build${{ github.run_number }}.ipa"
+          IPA="Aura-${VERSION}-build${{ github.run_number }}.ipa"
           (cd out && zip -qry "../$IPA" Payload)
           echo "IPA=$IPA" >> "$GITHUB_ENV"
           ls -lh "$IPA"
@@ -139,8 +138,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           NOTES="Unsigned IPA built from ${GITHUB_SHA::7} (run #${{ github.run_number }}). Install with Sideloadly, AltStore, SideStore or TrollStore."
-          # A fixed file name too, so .../releases/latest/download/SceneBox.ipa
+          # A fixed file name too, so .../releases/latest/download/Aura.ipa
           # always points at the newest build (handy for ESign's URL import).
-          cp "$IPA" SceneBox.ipa
+          cp "$IPA" Aura.ipa
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest SceneBox.ipa "$IPA" --title "SceneBox ${VERSION} (build ${{ github.run_number }})" --notes "$NOTES" --target "$GITHUB_SHA" --latest
+          gh release create latest Aura.ipa "$IPA" --title "Aura ${VERSION} (build ${{ github.run_number }})" --notes "$NOTES" --target "$GITHUB_SHA" --latest
