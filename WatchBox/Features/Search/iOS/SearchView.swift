@@ -235,6 +235,18 @@ struct SearchResults: View {
     @AppStorage("appLanguage") private var appLanguage = "ru"
     let model: SearchModel
     @Environment(\.horizontalSizeClass) private var sizeClass
+    
+    // Создаем собственные колонки вместо PosterMetrics, чтобы на iPhone их всегда было две
+    private var columns: [GridItem] {
+        if sizeClass == .compact {
+            return [
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16)
+            ]
+        } else {
+            return [GridItem(.adaptive(minimum: 160, maximum: 240), spacing: 16)]
+        }
+    }
 
     @ViewBuilder
     var body: some View {
@@ -255,7 +267,7 @@ struct SearchResults: View {
     /// Poster-shaped placeholders while the first page loads.
     private var placeholderGrid: some View {
         ScrollView {
-            LazyVGrid(columns: PosterMetrics.gridColumns(sizeClass), spacing: 16) {
+            LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(0..<12, id: \.self) { _ in
                     RoundedRectangle(cornerRadius: Theme.posterCorner, style: .continuous)
                         .fill(Theme.surface)
@@ -270,7 +282,7 @@ struct SearchResults: View {
 
     private var grid: some View {
         ScrollView {
-            LazyVGrid(columns: PosterMetrics.gridColumns(sizeClass), spacing: 16) {
+            LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(model.results) { item in
                     PosterLink(item: item) {
                         PosterCard(item: item)
