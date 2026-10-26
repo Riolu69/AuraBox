@@ -1,6 +1,6 @@
 //
 //  ProfileEditorView.swift
-//  SceneBox
+//  Aura
 //
 
 import SwiftUI
@@ -56,6 +56,10 @@ struct ProfileEditorView: View {
     @State private var removePhoto = false
     @State private var confirmDelete = false
     @State private var saving = false
+    
+    // ИСПРАВЛЕНИЕ: Добавляем FocusState для управления клавиатурой
+    @FocusState private var isNameFocused: Bool
+
     #if canImport(PhotosUI) && !os(tvOS)
     @State private var pickerItem: PhotosPickerItem?
     #endif
@@ -102,7 +106,10 @@ struct ProfileEditorView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
+        // ИСПРАВЛЕНИЕ: Убираем принудительную темную тему (.preferredColorScheme(.dark)),
+        // если хотите, чтобы экран адаптировался под систему.
+        // Если он ВСЕГДА должен быть темным (как экран входа) - раскомментируйте строку ниже:
+        // .preferredColorScheme(.dark) 
         .onAppear {
             profiles.errorMessage = nil
             if let existing {
@@ -123,17 +130,18 @@ struct ProfileEditorView: View {
         }
     }
 
-    // Обратите внимание на ZStack(alignment: .topTrailing)
     private var content: some View {
         ZStack(alignment: .topTrailing) {
             Theme.background.ignoresSafeArea()
+                // ИСПРАВЛЕНИЕ: Скрываем клавиатуру по клику на фон
+                .onTapGesture { isNameFocused = false }
             
             ScrollView {
                 VStack(spacing: 24) {
                     VStack(spacing: 8) {
                         Text(tr(isFirst ? "Create your profile" : (existing == nil ? "Add profile" : "Edit profile"), appLanguage))
                             .font(.largeTitle.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary) // ИСПРАВЛЕНИЕ: Был .white, стал .primary для светлой темы
                         if isFirst {
                             Text(tr("Everyone gets their own watch history and list.", appLanguage))
                                 .font(.subheadline)
@@ -146,26 +154,34 @@ struct ProfileEditorView: View {
 
                     photoControls
 
+                    // ИСПРАВЛЕНИЕ: Текстовое поле теперь корректно отображается и на светлой теме
                     TextField(tr("Name", appLanguage), text: $name)
                         .textContentType(.name)
+                        .focused($isNameFocused) // Подключаем фокус
                         #if os(iOS)
                         .textInputAutocapitalization(.words)
                         #endif
                         .autocorrectionDisabled()
                         .multilineTextAlignment(.center)
                         .font(.title3)
-                        .foregroundStyle(.white)
-                        .tint(.white)
+                        .foregroundStyle(.primary) // Был .white
+                        .tint(Theme.accent) // Был .white
                         .padding()
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .onChange(of: name) { _, new in
                             if new.count > Profile.maxNameLength { name = String(new.prefix(Profile.maxNameLength)) }
                         }
-                        .onSubmit(save)
+                        .onSubmit {
+                            isNameFocused = false // Скрываем клаву при нажатии "Return"
+                            if canSave { save() }
+                        }
 
                     colorSwatches
 
-                    Button(action: save) {
+                    Button(action: {
+                        isNameFocused = false // Скрываем клаву при клике
+                        save()
+                    }) {
                         ZStack {
                             if saving || profiles.isWorking {
                                 ProgressView().tint(Theme.onAccent)
@@ -182,10 +198,13 @@ struct ProfileEditorView: View {
                     .disabled(!canSave)
 
                     if existing != nil {
-                        Button(tr("Delete profile", appLanguage), role: .destructive) { confirmDelete = true }
-                            .buttonStyle(.bordered)
-                            .tint(.red)
-                            .disabled(profiles.isWorking)
+                        Button(tr("Delete profile", appLanguage), role: .destructive) { 
+                            isNameFocused = false
+                            confirmDelete = true 
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .disabled(profiles.isWorking)
                     }
 
                     if let error = profiles.errorMessage {
@@ -197,6 +216,8 @@ struct ProfileEditorView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
             }
+            // ИСПРАВЛЕНИЕ: Скрываем клавиатуру при скролле (iOS 16+)
+            .scrollDismissesKeyboard(.interactively)
             
             // КНОПКА СМЕНЫ ЯЗЫКА ТОЛЬКО ДЛЯ ПЕРВОГО ЭКРАНА РЕГИСТРАЦИИ
             if isFirst {
@@ -219,7 +240,7 @@ struct ProfileEditorView: View {
                 Label(tr(draft.hasPhoto || pickedImage != nil ? "Change photo" : "Choose photo", appLanguage), systemImage: "photo")
             }
             .buttonStyle(.bordered)
-            .tint(.white)
+            .tint(.primary) // ИСПРАВЛЕНИЕ: Был .white
             .onChange(of: pickerItem) { _, item in
                 guard let item else { return }
                 Task {
@@ -237,7 +258,7 @@ struct ProfileEditorView: View {
                     removePhoto = true
                 }
                 .buttonStyle(.bordered)
-                .tint(.white)
+                .tint(.primary) // ИСПРАВЛЕНИЕ: Был .white
             }
         }
         #else
@@ -251,6 +272,7 @@ struct ProfileEditorView: View {
         HStack(spacing: 18) {
             ForEach(Profile.colors.indices, id: \.self) { i in
                 Button {
+                    isNameFocused = false // Скрываем клаву при выборе цвета
                     colorIndex = i
                 } label: {
                     Circle()
@@ -258,7 +280,8 @@ struct ProfileEditorView: View {
                         .frame(width: 40, height: 40)
                         .overlay {
                             if colorIndex == i {
-                                Circle().strokeBorder(.white, lineWidth: 3).padding(-5)
+                                // ИСПРАВЛЕНИЕ: Сделал рамку серой/чёрной, чтобы она была видна на белом фоне
+                                Circle().strokeBorder(Color.primary, lineWidth: 3).padding(-5)
                             }
                         }
                 }
