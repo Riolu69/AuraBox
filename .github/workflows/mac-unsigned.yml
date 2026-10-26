@@ -17,31 +17,43 @@ jobs:
           echo "Resolving package dependencies..."
           xcodebuild -resolvePackageDependencies -project WatchBox.xcodeproj -scheme WatchBox -derivedDataPath build_output || true
 
-          echo "Searching and patching SwiftVLC files..."
-          
-          # Универсальный поиск файлов SwiftVLC в любых возможных подпапках кэша Xcode
+          echo "Patching SwiftVLC modern concurrency APIs for macOS/Catalyst..."
+
+          # 1. Патчим Track.swift (String validating)
           TRACK_FILE=$(find build_output -name "Track.swift" | grep "SwiftVLC" | head -n 1)
           if [ -n "$TRACK_FILE" ] && [ -f "$TRACK_FILE" ]; then
-            echo "Patching Track.swift at: $TRACK_FILE"
             sed -i '' 's/String(validating: payload, as: UTF8.self)/String(decoding: payload, as: UTF8.self)/g' "$TRACK_FILE"
-          else
-            echo "Warning: Track.swift not found!"
           fi
 
+          # 2. Патчим PiPController.swift
           PIP_FILE=$(find build_output -name "PiPController.swift" | grep "SwiftVLC" | head -n 1)
           if [ -n "$PIP_FILE" ] && [ -f "$PIP_FILE" ]; then
-            echo "Patching PiPController.swift at: $PIP_FILE"
-            sed -i '' 's/public final class PiPController/@available(macOS 14.0, *)\npublic final class PiPController/g' "$PIP_FILE"
-          else
-            echo "Warning: PiPController.swift not found!"
+            sed -i '' 's/public final class PiPController/@available(macOS 15.0, *)\npublic final class PiPController/g' "$PIP_FILE"
           fi
 
+          # 3. Патчим ThumbnailRequest.swift
           THUMB_FILE=$(find build_output -name "ThumbnailRequest.swift" | grep "SwiftVLC" | head -n 1)
           if [ -n "$THUMB_FILE" ] && [ -f "$THUMB_FILE" ]; then
-            echo "Patching ThumbnailRequest.swift at: $THUMB_FILE"
-            sed -i '' 's/private final class ThumbnailOperation/@available(macOS 14.0, *)\nprivate final class ThumbnailOperation/g' "$THUMB_FILE"
-          else
-            echo "Warning: ThumbnailRequest.swift not found!"
+            sed -i '' 's/private final class ThumbnailOperation/@available(macOS 15.0, *)\nprivate final class ThumbnailOperation/g' "$THUMB_FILE"
+          fi
+
+          # 4. Патчим Player+NativeLifecycle.swift (ошибки с withLock)
+          LIFE_FILE=$(find build_output -name "Player+NativeLifecycle.swift" | grep "SwiftVLC" | head -n 1)
+          if [ -n "$LIFE_FILE" ] && [ -f "$LIFE_FILE" ]; then
+            sed -i '' 's/final class NativePlayerHandleLifetime/@available(macOS 15.0, *)\nfinal class NativePlayerHandleLifetime/g' "$LIFE_FILE"
+            sed -i '' 's/final class NativePlayerHandleLease/@available(macOS 15.0, *)\nfinal class NativePlayerHandleLease/g' "$LIFE_FILE"
+          fi
+
+          # 5. Патчим Player.swift (ошибка с Atomic<Bool>)
+          PLAYER_FILE=$(find build_output -name "Player.swift" | grep "SwiftVLC" | head -n 1)
+          if [ -n "$PLAYER_FILE" ] && [ -f "$PLAYER_FILE" ]; then
+            sed -i '' 's/public final class Player/@available(macOS 15.0, *)\npublic final class Player/g' "$PLAYER_FILE"
+          fi
+
+          # 6. Патчим PlayerCapabilitySnapshot.swift (ошибки с withLock)
+          CAP_FILE=$(find build_output -name "PlayerCapabilitySnapshot.swift" | grep "SwiftVLC" | head -n 1)
+          if [ -n "$CAP_FILE" ] && [ -f "$CAP_FILE" ]; then
+            sed -i '' 's/extension Player/@available(macOS 15.0, *)\nextension Player/g' "$CAP_FILE"
           fi
 
       - name: Build Mac Catalyst app
