@@ -278,9 +278,9 @@ struct MediaDetailView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
-            .clipShape(Capsule()) // Делает кнопку идеально овальной
+            .clipShape(Capsule())
 
-            // ОСТАЛЬНЫЕ КНОПКИ (ниже)
+            // ОСТАЛЬНЫЕ КНОПКИ (Отцентрованные)
             HStack(spacing: 16) {
                 if detail.type == .series {
                     Menu {
@@ -362,11 +362,10 @@ struct MediaDetailView: View {
                     .tint(watched ? Theme.accent : .primary)
                     .clipShape(Circle())
                 }
-                
-                Spacer() // Толкает иконки влево
             }
+            .frame(maxWidth: .infinity, alignment: .center) // <- ВОТ ОНО! Центрирует круглые кнопки
         }
-        .frame(maxWidth: Platform.isMac ? 480 : .infinity, alignment: .leading)
+        .frame(maxWidth: Platform.isMac ? 480 : .infinity, alignment: .center)
         .padding(.horizontal, 20)
         .disabled(streamer.isPreparing || isAutoResolving || batchStatus != nil)
     }
