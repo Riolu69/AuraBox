@@ -64,11 +64,15 @@ struct LibraryView: View {
                         .padding(.horizontal, controlInset)
                         .padding(.top, 10)
                         .padding(.bottom, 12)
+                    
+                    // ИСПРАВЛЕНИЕ: Заставляем контент занимать всё место и прижиматься к верху
                     content
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
                 #endif
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // ИСПРАВЛЕНИЕ: Прижимаем весь экран к верхнему краю, чтобы он не центрировался
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Theme.background)
             #if os(tvOS)
             .pageTitle(tr("Library", appLanguage))
