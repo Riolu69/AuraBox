@@ -65,13 +65,12 @@ struct LibraryView: View {
                         .padding(.top, 10)
                         .padding(.bottom, 12)
                     
-                    // Контент прижимается к верху
+                    // ИСПРАВЛЕНИЕ 1: Убрали alignment: .top, чтобы контент мог центрироваться
                     content
-                        .frame(maxHeight: .infinity, alignment: .top)
+                        .frame(maxHeight: .infinity)
                 }
                 #endif
             }
-            // Главный экран прижимается к верху, чтобы не центрировался пустой список
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Theme.background)
             #if os(tvOS)
@@ -118,7 +117,9 @@ private struct WatchlistSection: View {
 
     var body: some View {
         if watchlist.items.isEmpty {
+            // ИСПРАВЛЕНИЕ 2: Заставляем пустое состояние занимать всю высоту и центрироваться
             EmptyStateView(systemImage: "bookmark", title: tr("No saved titles", appLanguage), message: tr("Add movies and shows to your Watchlist from their detail pages.", appLanguage))
+                .frame(maxHeight: .infinity)
         } else {
             MediaGridView(items: watchlist.items.map { MediaGridItem(id: $0.id, title: $0.title, poster: $0.posterURLString, type: $0.mediaType) })
         }
@@ -132,6 +133,7 @@ private struct HistorySection: View {
     var body: some View {
         if progressStore.items.isEmpty {
             EmptyStateView(systemImage: "clock.arrow.circlepath", title: tr("No history yet", appLanguage), message: tr("Titles you watch will appear here.", appLanguage))
+                .frame(maxHeight: .infinity)
         } else {
             MediaGridView(items: progressStore.items.map { MediaGridItem(id: $0.id, title: $0.title, poster: $0.posterURLString, type: $0.mediaType) })
         }
@@ -145,6 +147,7 @@ private struct PlanToWatchSection: View {
     var body: some View {
         if planStore.items.isEmpty {
             EmptyStateView(systemImage: "calendar.badge.clock", title: tr("Nothing planned", appLanguage), message: tr("Add titles you want to watch later.", appLanguage))
+                .frame(maxHeight: .infinity)
         } else {
             MediaGridView(items: planStore.items.map { MediaGridItem(id: $0.id, title: $0.title, poster: $0.posterURLString, type: $0.mediaType) })
         }
@@ -165,7 +168,6 @@ private struct MediaGridItem: Identifiable {
 private struct MediaGridView: View {
     let items: [MediaGridItem]
     
-    // ИСПРАВЛЕНИЕ СЕТКИ ПОСТЕРОВ: Теперь они не огромные, а выстраиваются адаптивно (как в поиске)
     #if os(tvOS)
     let columns = [GridItem(.adaptive(minimum: 200, maximum: 300), spacing: 20)]
     #else
