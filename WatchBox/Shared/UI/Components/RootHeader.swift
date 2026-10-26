@@ -1,6 +1,6 @@
 //
 //  RootHeader.swift
-//  SceneBox
+//  Aura
 //
 
 import SwiftUI
@@ -16,7 +16,8 @@ struct RootHeader<Trailing: View>: View {
         HStack(alignment: .center, spacing: 12) {
             Text(title)
                 .font(.display(34))
-                .foregroundStyle(.white)
+                // ИСПРАВЛЕНИЕ: Был .white, теперь .primary (адаптируется под светлую/темную тему)
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)
@@ -38,7 +39,8 @@ extension RootHeader where Trailing == EmptyView {
 struct HeaderIconButton: View {
     let systemImage: String
     let label: String
-    var tint: Color = .white
+    // ИСПРАВЛЕНИЕ: Иконки теперь тоже адаптивные по умолчанию
+    var tint: Color = .primary
     let action: () -> Void
 
     var body: some View {
