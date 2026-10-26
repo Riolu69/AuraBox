@@ -14,28 +14,34 @@ jobs:
 
       - name: Resolve and Patch SwiftVLC dependencies
         run: |
-          # Сначала запускаем простую генерацию или резолв пакетов, чтобы SwiftVLC скачался в build_output
+          echo "Resolving package dependencies..."
           xcodebuild -resolvePackageDependencies -project WatchBox.xcodeproj -scheme WatchBox -derivedDataPath build_output || true
 
-          # Проверяем и патчим Track.swift (ошибка с String(validating:as:))
-          TRACK_FILE="build_output/SourcePackages/checkouts/SwiftVLC/Sources/SwiftVLC/Media/Track.swift"
-          if [ -f "$TRACK_FILE" ]; then
-            echo "Patching SwiftVLC Track.swift..."
+          echo "Searching and patching SwiftVLC files..."
+          
+          # Универсальный поиск файлов SwiftVLC в любых возможных подпапках кэша Xcode
+          TRACK_FILE=$(find build_output -name "Track.swift" | grep "SwiftVLC" | head -n 1)
+          if [ -n "$TRACK_FILE" ] && [ -f "$TRACK_FILE" ]; then
+            echo "Patching Track.swift at: $TRACK_FILE"
             sed -i '' 's/String(validating: payload, as: UTF8.self)/String(decoding: payload, as: UTF8.self)/g' "$TRACK_FILE"
+          else
+            echo "Warning: Track.swift not found!"
           fi
 
-          # Проверяем и патчим PiPController.swift (ошибка с Mutex / доступностью)
-          PIP_FILE="build_output/SourcePackages/checkouts/SwiftVLC/Sources/SwiftVLC/PiP/PiPController.swift"
-          if [ -f "$PIP_FILE" ]; then
-            echo "Patching SwiftVLC PiPController.swift..."
+          PIP_FILE=$(find build_output -name "PiPController.swift" | grep "SwiftVLC" | head -n 1)
+          if [ -n "$PIP_FILE" ] && [ -f "$PIP_FILE" ]; then
+            echo "Patching PiPController.swift at: $PIP_FILE"
             sed -i '' 's/public final class PiPController/@available(macOS 14.0, *)\npublic final class PiPController/g' "$PIP_FILE"
+          else
+            echo "Warning: PiPController.swift not found!"
           fi
 
-          # Проверяем и патчим ThumbnailRequest.swift
-          THUMB_FILE="build_output/SourcePackages/checkouts/SwiftVLC/Sources/SwiftVLC/Media/ThumbnailRequest.swift"
-          if [ -f "$THUMB_FILE" ]; then
-            echo "Patching SwiftVLC ThumbnailRequest.swift..."
+          THUMB_FILE=$(find build_output -name "ThumbnailRequest.swift" | grep "SwiftVLC" | head -n 1)
+          if [ -n "$THUMB_FILE" ] && [ -f "$THUMB_FILE" ]; then
+            echo "Patching ThumbnailRequest.swift at: $THUMB_FILE"
             sed -i '' 's/private final class ThumbnailOperation/@available(macOS 14.0, *)\nprivate final class ThumbnailOperation/g' "$THUMB_FILE"
+          else
+            echo "Warning: ThumbnailRequest.swift not found!"
           fi
 
       - name: Build Mac Catalyst app
