@@ -52,13 +52,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.PACKAGES }}
-          key: spm-v2-${{ runner.os }}-${{ hashFiles('WatchBox.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-          restore-keys: spm-v2-${{ runner.os }}-
-
-      - name: Clear stale binary artifacts
-        run: |
-          rm -rf build/SourcePackages/artifacts
-          rm -rf build/SourcePackages/repositories
+          key: spm-v5-${{ runner.os }}-${{ hashFiles('WatchBox.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: spm-v5-${{ runner.os }}-
 
       - name: Resolve Package Dependencies
         run: |
