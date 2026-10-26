@@ -65,7 +65,7 @@ struct LibraryView: View {
                         .padding(.top, 10)
                         .padding(.bottom, 12)
                     
-                    // ИСПРАВЛЕНИЕ 1: Убрали alignment: .top, чтобы контент мог центрироваться
+                    // Контент занимает всё свободное место (для центрирования пустых экранов)
                     content
                         .frame(maxHeight: .infinity)
                 }
@@ -83,15 +83,33 @@ struct LibraryView: View {
         }
     }
 
+    // НОВОЕ МЕНЮ В 2 РЯДА
     @ViewBuilder
     private var sectionPicker: some View {
-        Picker(tr("Section", appLanguage), selection: $section) {
-            ForEach(Section.allCases) { option in 
-                Text(tr(option.rawValue, appLanguage)).tag(option) 
+        let columns = [GridItem(.flexible()), GridItem(.flexible())]
+        
+        LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(Section.allCases) { option in
+                let isSelected = section == option
+                
+                Button {
+                    withAnimation(.snappy) {
+                        section = option
+                    }
+                } label: {
+                    Text(tr(option.rawValue, appLanguage))
+                        .font(.subheadline.weight(isSelected ? .semibold : .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8) // Слегка сожмет текст, если не влезет
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        // Подсветка активной кнопки
+                        .background(isSelected ? Theme.surface : Color.primary.opacity(0.08), in: Capsule())
+                        .foregroundStyle(isSelected ? .primary : .secondary)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .pickerStyle(.segmented)
-        .sensoryFeedback(.selection, trigger: section)
     }
 
     @ViewBuilder
@@ -117,7 +135,6 @@ private struct WatchlistSection: View {
 
     var body: some View {
         if watchlist.items.isEmpty {
-            // ИСПРАВЛЕНИЕ 2: Заставляем пустое состояние занимать всю высоту и центрироваться
             EmptyStateView(systemImage: "bookmark", title: tr("No saved titles", appLanguage), message: tr("Add movies and shows to your Watchlist from their detail pages.", appLanguage))
                 .frame(maxHeight: .infinity)
         } else {
@@ -168,6 +185,7 @@ private struct MediaGridItem: Identifiable {
 private struct MediaGridView: View {
     let items: [MediaGridItem]
     
+    // АДАПТИВНАЯ СЕТКА ПОСТЕРОВ (как в поиске)
     #if os(tvOS)
     let columns = [GridItem(.adaptive(minimum: 200, maximum: 300), spacing: 20)]
     #else
