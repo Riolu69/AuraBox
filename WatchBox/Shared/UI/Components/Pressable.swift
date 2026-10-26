@@ -1,6 +1,6 @@
 //
 //  Pressable.swift
-//  SceneBox
+//  Aura
 //
 
 import SwiftUI
@@ -127,7 +127,8 @@ private struct ToastModifier: ViewModifier {
                 if let message {
                     Label(message.text, systemImage: message.systemImage)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
+                        // ИСПРАВЛЕНИЕ: Был .white, теперь .primary, чтобы текст был контрастным и в светлой, и в темной теме
+                        .foregroundStyle(.primary) 
                         .padding(.horizontal, 18)
                         .padding(.vertical, 12)
                         .background(.regularMaterial, in: Capsule())
