@@ -1,6 +1,6 @@
 //
 //  LibraryView.swift
-//  SceneBox
+//  Aura
 //
 
 import SwiftUI
@@ -161,7 +161,16 @@ private struct MediaGridItem: Identifiable {
 
 private struct MediaGridView: View {
     let items: [MediaGridItem]
-    let columns = [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 16)]
+    
+    // Меняем настройки колонок: 2 ровные колонки для iOS, растягивающиеся по ширине
+    #if os(tvOS)
+    let columns = [GridItem(.adaptive(minimum: 200, maximum: 300), spacing: 20)]
+    #else
+    let columns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
+    #endif
 
     // Подключаем сторы для возможности удаления
     @AppStorage("appLanguage") private var appLanguage = "ru"
@@ -171,22 +180,24 @@ private struct MediaGridView: View {
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 20) {
+            LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(items) { item in
                     NavigationLink(value: item.result) {
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 8) {
                             if let posterString = item.poster, let url = URL(string: posterString) {
                                 KFImage(url)
                                     .resizable()
                                     .placeholder { Theme.surface }
-                                    .scaledToFill()
-                                    .frame(minWidth: 110, maxWidth: 160, minHeight: 160, maxHeight: 240)
+                                    // Растягиваем на всю ширину колонки с сохранением пропорций постера (2:3)
+                                    .aspectRatio(2/3, contentMode: .fill)
+                                    .frame(maxWidth: .infinity)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .shadow(radius: 4)
                             } else {
                                 RoundedRectangle(cornerRadius: 12)
                                     .fill(Theme.surface)
-                                    .frame(minWidth: 110, maxWidth: 160, minHeight: 160, maxHeight: 240)
+                                    .aspectRatio(2/3, contentMode: .fit)
+                                    .frame(maxWidth: .infinity)
                                     .overlay(Text(item.title).font(.caption).multilineTextAlignment(.center).padding())
                             }
                             Text(item.title)
