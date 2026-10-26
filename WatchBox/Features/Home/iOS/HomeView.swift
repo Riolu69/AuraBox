@@ -1,3 +1,4 @@
+//
 //  HomeView.swift
 //  Aura
 //
@@ -202,7 +203,8 @@ private struct FeaturedMarquee: View {
 
 private struct FeaturedCard: View {
     let item: MediaResult
-[26.10.2026 18:19] Николай Племянник: var body: some View {
+    
+    var body: some View {
         Color.clear
             .aspectRatio(4.0 / 3.0, contentMode: .fit)
             .background {
@@ -407,7 +409,8 @@ private struct PosterShelf: View {
         }
     }
 }
-[26.10.2026 18:19] Николай Племянник: /// "Top 10": градиентная цифра, наполовину заходящая на постер.
+
+/// "Top 10": градиентная цифра, наполовину заходящая на постер.
 private struct RankedCard: View {
     let rank: Int
     let item: MediaResult
@@ -468,5 +471,4 @@ private struct PlaceholderShelf: View {
         .accessibilityHidden(true)
     }
 }
-
 #endif
