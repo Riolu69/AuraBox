@@ -1,4 +1,3 @@
-//
 //  HomeView.swift
 //  Aura
 //
@@ -27,7 +26,7 @@ struct HomeView: View {
                     feed
                 }
             }
-            .background(Theme.background)
+            .background(Theme.background.ignoresSafeArea())
             .statusBarScrim()
             .toolbar(.hidden, for: .navigationBar)
             .mediaNavigationDestinations()
@@ -45,20 +44,35 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Header
+
     private var header: some View {
-        RootHeader(title: "Aura") {
+        HStack(alignment: .center) {
+            Text("Aura")
+                .font(.display(40, weight: .black))
+                .foregroundStyle(Theme.brandGradient)
+                .shadow(color: Theme.accent.opacity(0.35), radius: 12, y: 4)
+
+            Spacer()
+
             HeaderIconButton(systemImage: "magnifyingglass", label: "Search") {
                 TabRouter.shared.openSearch()
             }
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
     }
+
+    // MARK: - Feed
 
     private var feed: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: Platform.isMac ? 36 : 30) {
+                LazyVStack(alignment: .leading, spacing: Platform.isMac ? 38 : 32) {
                     header
-                        .padding(.bottom, -12)          // the marquee sits close under the title
+
                     if !featured.isEmpty {
                         FeaturedMarquee(items: featured)
                     }
@@ -66,11 +80,13 @@ struct HomeView: View {
                         ContinueWatchingShelf(items: progress.continueItems)
                     }
                     if !unwatchedWatchlist.isEmpty {
-                        PosterShelf(title: "Your Watchlist", items: unwatchedWatchlist)
+                        PosterShelf(title: "Your Watchlist", items: unwatchedWatchlist, accent: .pink)
                     }
                     if let because = model.becauseYouWatched {
-                        PosterShelf(title: because.title, items: because.items, seeAll: because.destination)
+                        PosterShelf(title: because.title, items: because.items,
+                                    seeAll: because.destination, accent: .cyan)
                     }
+
                     if model.shelves.isEmpty {
                         // Placeholders keep the layout still while the catalog loads.
                         ForEach(0..<3, id: \.self) { _ in PlaceholderShelf() }
@@ -89,7 +105,7 @@ struct HomeView: View {
                         }
                     }
                 }
-                .padding(.bottom, 28)
+                .padding(.bottom, 40)
             }
             .refreshable {
                 progress.refresh()
@@ -98,7 +114,7 @@ struct HomeView: View {
                 _ = await (catalog, saved)
             }
             .onChange(of: model.shelves.isEmpty) { _, empty in
-                // `-SBHomeRow series-top` opens Home at that row (screenshots, debugging).
+                // -SBHomeRow series-top opens Home at that row (screenshots, debugging).
                 if !empty, let row = UserDefaults.standard.string(forKey: "SBHomeRow") {
                     proxy.scrollTo(row, anchor: .top)
                 }
@@ -106,7 +122,7 @@ struct HomeView: View {
         }
     }
 
-    /// A few popular movies and shows, alternating, for the marquee.
+    /// Популярные фильмы и сериалы, чередуются для маркиза.
     private var featured: [MediaResult] {
         let pools = model.shelves.filter(\.isRanked).map { shelf in
             Array(shelf.items.filter { $0.backdropURL != nil }.prefix(3))
@@ -127,10 +143,18 @@ struct HomeView: View {
     }
 }
 
+// MARK: - Theme helpers
+
+private extension Theme {
+    /// Яркий градиент для логотипа и акцентов.
+    static var brandGradient: LinearGradient {
+        LinearGradient(colors: [.pink, .purple, Theme.accent], startPoint: .leading, endPoint: .trailing)
+    }
+}
+
 // MARK: - Marquee
 
-/// The featured strip at the top of Home: wide backdrops with the title's logo,
-/// swiped one page at a time. Neighbouring cards peek in to show there's more.
+/// Верхняя лента: широкие бэкдропы с логотипом, листается по одной карточке.
 private struct FeaturedMarquee: View {
     let items: [MediaResult]
     @State private var current: String?
@@ -138,31 +162,31 @@ private struct FeaturedMarquee: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
+                LazyHStack(spacing: 14) {
                     ForEach(items) { item in
                         PosterLink(item: item) {
                             FeaturedCard(item: item)
                         }
                         .overlay(alignment: .topTrailing) { FeaturedWatchlistButton(item: item) }
                         .containerRelativeFrame(.horizontal) { width, _ in
-                            sizeClass == .regular ? min(width * 0.72, 900) : width - 28
+                            sizeClass == .regular ? min(width * 0.62, 760) : width - 40
                         }
-                        // Cards leaving the centre recede while the finger drags them.
                         .scrollTransition(axis: .horizontal) { content, phase in
                             content
-                                .scaleEffect(phase.isIdentity || reduceMotion ? 1 : 0.94)
-                                .opacity(phase.isIdentity ? 1 : 0.55)
+                                .scaleEffect(phase.isIdentity || reduceMotion ? 1 : 0.92)
+                                .rotation3DEffect(.degrees(phase.isIdentity || reduceMotion ? 0 : phase.value * 8),
+                                                  axis: (x: 0, y: 1, z: 0))
+                                .opacity(phase.isIdentity ? 1 : 0.5)
                         }
                         .id(item.id)
                     }
                 }
                 .scrollTargetLayout()
-                // Паддинги для красивого скролла
-                .padding(.vertical, 10)
+                .padding(.vertical, 12)
             }
-            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .contentMargins(.horizontal, 20, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $current)
             .scrollClipDisabled()
@@ -178,8 +202,7 @@ private struct FeaturedMarquee: View {
 
 private struct FeaturedCard: View {
     let item: MediaResult
-
-    var body: some View {
+[26.10.2026 18:19] Николай Племянник: var body: some View {
         Color.clear
             .aspectRatio(4.0 / 3.0, contentMode: .fit)
             .background {
@@ -187,29 +210,33 @@ private struct FeaturedCard: View {
                     .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 1200, height: 900)))
                     .cacheOriginalImage()
                     .cancelOnDisappear(true)
-                    .fade(duration: 0.25)
+                    .fade(duration: 0.3)
                     .placeholder { Theme.surface }
                     .resizable()
                     .scaledToFill()
             }
             .overlay {
+                // Цветной градиент поверх картинки вместо серого затемнения.
                 LinearGradient(stops: [
-                    .init(color: .clear, location: 0.25),
-                    .init(color: .black.opacity(0.4), location: 0.6),
-                    .init(color: .black.opacity(0.85), location: 1),
+                    .init(color: .clear, location: 0.2),
+                    .init(color: .purple.opacity(0.35), location: 0.6),
+                    .init(color: .black.opacity(0.9), location: 1),
                 ], startPoint: .top, endPoint: .bottom)
             }
             .overlay(alignment: .bottomLeading) { caption }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            // Добавлена нативная эппловская мягкая тень (Drop Shadow)
-            .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(.white.opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: .purple.opacity(0.35), radius: 18, y: 10)
             .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .accessibilityElement(children: .combine)
             .accessibilityLabel(item.name)
     }
 
     private var caption: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             if let logo = item.logoURL {
                 KFImage(logo)
                     .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 600, height: 240)))
@@ -217,39 +244,54 @@ private struct FeaturedCard: View {
                     .placeholder { titleText }
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: 220, maxHeight: 76, alignment: .bottomLeading)
+                    .frame(maxWidth: 240, maxHeight: 80, alignment: .bottomLeading)
                     .shadow(color: .black.opacity(0.5), radius: 8)
             } else {
                 titleText
             }
-            HStack(spacing: 10) {
-                if let year = item.year { Text(year) }
+
+            HStack(spacing: 8) {
+                if let year = item.year {
+                    chip(year, tint: .white.opacity(0.2))
+                }
                 if let rating = item.imdbRating, !rating.isEmpty {
                     Label(rating, systemImage: "star.fill")
-                        .labelStyle(.titleAndIcon)
-                        .foregroundStyle(.yellow)
+                        .font(.caption.weight(.heavy))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.yellow, in: Capsule())
+                        .foregroundStyle(.black)
                 }
                 if !item.genres.isEmpty {
-                    Text(item.genres.prefix(2).joined(separator: ", "))
-                        .lineLimit(1)
+                    chip(item.genres.prefix(2).joined(separator: " • "), tint: .pink.opacity(0.6))
                 }
             }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.85))
         }
-        .padding(18)
+        .padding(20)
     }
 
     private var titleText: some View {
         Text(item.name)
-            .font(.display(30, weight: .bold))
+            .font(.display(36, weight: .black))
             .foregroundStyle(.white)
             .lineLimit(2)
             .minimumScaleFactor(0.7)
+            .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+    }
+
+    private func chip(_ text: String, tint: Color) -> some View {
+        Text(text)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(tint, in: Capsule())
+            .overlay(Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 0.5))
     }
 }
 
-/// Sits over the card (not inside its link) so the tap reaches it.
+/// Лежит поверх карточки (не внутри ссылки), чтобы тап доходил до кнопки.
 private struct FeaturedWatchlistButton: View {
     let item: MediaResult
     @Environment(WatchlistStore.self) private var watchlist
@@ -263,15 +305,23 @@ private struct FeaturedWatchlistButton: View {
         } label: {
             Image(systemName: saved ? "bookmark.fill" : "bookmark")
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(saved ? Theme.accent : .white)
+                .foregroundStyle(saved ? .black : .white)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 38, height: 38)
-                .background(.ultraThinMaterial, in: Circle()) // Apple Blur
-                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                .frame(width: 42, height: 42)
+                .background {
+                    if saved {
+                        Circle().fill(LinearGradient(colors: [.yellow, .orange],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                    } else {
+                        Circle().fill(.ultraThinMaterial)
+                    }
+                }
+                .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1))
+                .shadow(color: saved ? .orange.opacity(0.5) : .black.opacity(0.15), radius: 8, y: 3)
         }
         .buttonStyle(.pressable)
         .sensoryFeedback(.selection, trigger: saved)
-        .padding(12)
+        .padding(14)
         .accessibilityLabel(saved ? "Remove from Watchlist" : "Add to Watchlist")
     }
 }
@@ -284,8 +334,11 @@ private struct PageDots: View {
         HStack(spacing: 6) {
             ForEach(0..<count, id: \.self) { i in
                 Capsule()
-                    .fill(i == index ? Theme.accent : Color.gray.opacity(0.3))
-                    .frame(width: i == index ? 18 : 6, height: 6)
+                    .fill(i == index
+                          ? AnyShapeStyle(LinearGradient(colors: [.pink, Theme.accent],
+                                                         startPoint: .leading, endPoint: .trailing))
+                          : AnyShapeStyle(Color.white.opacity(0.22)))
+                    .frame(width: i == index ? 22 : 6, height: 6)
             }
         }
         .animation(Theme.snappy, value: index)
@@ -301,16 +354,33 @@ private struct PosterShelf: View {
     let items: [MediaResult]
     var seeAll: CatalogDestination?
     var ranked = false
+    var accent: Color = Theme.accent
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Platform.isMac ? 16 : 14) {
-            SectionHeader(title: title) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                // Яркая полоска слева от заголовка.
+                Capsule()
+                    .fill(LinearGradient(colors: [accent, accent.opacity(0.3)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(width: 4, height: 22)
+
+                Text(title)
+                    .font(.title3.weight(.black))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Spacer()
+
                 if let seeAll {
                     NavigationLink(value: seeAll) {
                         Text("See all")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.accent)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(accent.opacity(0.9), in: Capsule())
                     }
                     .buttonStyle(.pressable)
                 }
@@ -324,20 +394,20 @@ private struct PosterShelf: View {
                             if ranked {
                                 RankedCard(rank: index + 1, item: item, width: PosterMetrics.shelfWidth(sizeClass))
                             } else {
-                                PosterCard(item: item).frame(width: PosterMetrics.shelfWidth(sizeClass))
+                                PosterCard(item: item)
+                                    .frame(width: PosterMetrics.shelfWidth(sizeClass))
+                                    .shadow(color: accent.opacity(0.25), radius: 12, y: 6)
                             }
                         }
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10) // Воздух для карточек и мягких теней
+                .padding(.vertical, 10)
             }
         }
     }
 }
-
-/// A "Top 10" entry: the rank in tall condensed type with the poster
-/// overlapping its right edge.
+[26.10.2026 18:19] Николай Племянник: /// "Top 10": градиентная цифра, наполовину заходящая на постер.
 private struct RankedCard: View {
     let rank: Int
     let item: MediaResult
@@ -346,18 +416,25 @@ private struct RankedCard: View {
     var body: some View {
         let size = width * 1.7
         let metrics = UIFont.systemFont(ofSize: size, weight: .black)
-        HStack(alignment: .bottom, spacing: -width * 0.16) {
-            Text(String(rank))   // Western digits in every locale, like the posters
+        HStack(alignment: .bottom, spacing: -width * 0.18) {
+            Text(String(rank))   // Арабские цифры во всех локалях, как на постерах.
                 .font(.display(size, weight: .black))
-                .foregroundStyle(.linearGradient(colors: [.primary.opacity(0.8), .primary.opacity(0.1)],
-                                                 startPoint: .top, endPoint: .bottom))
+                .foregroundStyle(
+                    LinearGradient(colors: [.pink, .purple, Theme.accent.opacity(0.6)],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+                .shadow(color: .purple.opacity(0.5), radius: 10, y: 4)
                 .fixedSize()
-                // Trim the line box to the digits so they stand on the poster's bottom edge.
                 .padding(.top, metrics.capHeight - metrics.ascender)
                 .padding(.bottom, metrics.descender)
             PosterCard(item: item)
                 .frame(width: width)
-                .shadow(color: Color.black.opacity(0.15), radius: 8, x: -3, y: 4)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.white.opacity(0.15), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.3), radius: 10, x: -3, y: 6)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Number \(rank), \(item.name)")
@@ -368,15 +445,18 @@ private struct PlaceholderShelf: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+        VStack(alignment: .leading, spacing: 14) {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Theme.surface)
-                .frame(width: 170, height: 22)
+                .frame(width: 180, height: 24)
                 .padding(.horizontal, 16)
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 ForEach(0..<5, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: Theme.posterCorner, style: .continuous)
-                        .fill(Theme.surface)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(
+                            LinearGradient(colors: [Theme.surface, Theme.surface.opacity(0.5)],
+                                           startPoint: .top, endPoint: .bottom)
+                        )
                         .frame(width: PosterMetrics.shelfWidth(sizeClass))
                         .aspectRatio(Theme.posterAspect, contentMode: .fit)
                 }
