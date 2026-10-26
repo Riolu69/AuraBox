@@ -65,6 +65,8 @@ scripts/release-mac.sh 1.0.0       # Signed + notarized macOS DMG
 scripts/export-ipa.sh 1.0.0        # Unsigned iOS IPA for sideloading
 scripts/export-ipa.sh 1.0.0 tvos   # Unsigned tvOS IPA for sideloading
 
+
+
 Debug Launch Flags
 -WBAutoStreamMagnet '<magnet>' — Start streaming a specific magnet link instantly at launch.
 
