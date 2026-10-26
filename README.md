@@ -1,8 +1,8 @@
-# SceneBox
+# Aura
 
 ![SceneBox on Mac and iPhone](website/images/mac-detail.png)
 
-# Aura
+
 
 A modern, high-performance media streaming and BitTorrent/HTTP client for iOS, iPadOS, tvOS, and macOS (Catalyst), built entirely in SwiftUI.
 
