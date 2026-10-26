@@ -2,6 +2,8 @@
 
 ![SceneBox on Mac and iPhone](website/images/mac-detail.png)
 
+# Aura
+
 A modern, high-performance media streaming and BitTorrent/HTTP client for iOS, iPadOS, tvOS, and macOS (Catalyst), built entirely in SwiftUI.
 
 ---
@@ -12,7 +14,7 @@ Aura is a media player and BitTorrent/HTTP client utility. It does not provide, 
 
 - All catalog metadata, stream listings, and media files are retrieved from third-party services and peers configured or connected by the user. These services are independent of Aura, are not operated, controlled, endorsed, or reviewed by the author, and may be changed or removed at any time.
 - Users are solely responsible for the content they choose to access, for ensuring they have the legal right to do so, and for complying with all applicable copyright laws in their jurisdiction. The author does not encourage, condone, or accept responsibility for any infringing use.
-- The software is provided "as is", without warranty of any kind, for personal and lawful use only. See [LICENSE](LICENSE).
+- The software is provided "as is", without warranty of any kind, for personal and lawful use only. See [LICENSE](https://github.com/Riolu69/Aura/blob/main/LICENSE).
 
 If you are a rights holder and believe a third-party source accessible through this software infringes your rights, please contact that source directly, as the author has no control over it.
 
@@ -81,4 +83,4 @@ Questions, bug reports, and feature ideas are always welcome:
 
 ## License
 
-Personal, non-commercial use only. You may read the source code and build it for your own personal use; you may not sell it, redistribute it, or use it in any commercial product or service. See [LICENSE](LICENSE).
+Personal, non-commercial use only. You may read the source code and build it for your own personal use; you may not sell it, redistribute it, or use it in any commercial product or service. See [LICENSE](https://github.com/Riolu69/Aura/blob/main/LICENSE).
