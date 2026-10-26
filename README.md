@@ -2,7 +2,6 @@
 
 ![SceneBox on Mac and iPhone](website/images/mac-detail.png)
 
-
 A modern, high-performance media streaming and BitTorrent/HTTP client for iOS, iPadOS, tvOS, and macOS (Catalyst), built entirely in SwiftUI.
 
 ---
@@ -59,10 +58,27 @@ Every push to the repository automatically triggers a GitHub Actions workflow (`
 ## Release & Debug Automation
 
 ### Release Scripts
-```bash
-scripts/release-mac.sh 1.0.0       # Signed + notarized macOS DMG
-scripts/export-ipa.sh 1.0.0        # Unsigned iOS IPA for sideloading
-scripts/export-ipa.sh 1.0.0 tvos   # Unsigned tvOS IPA for sideloading
+- `scripts/release-mac.sh 1.0.0` — Signed + notarized macOS DMG
+- `scripts/export-ipa.sh 1.0.0` — Unsigned iOS IPA for sideloading
+- `scripts/export-ipa.sh 1.0.0 tvos` — Unsigned tvOS IPA for sideloading
 
-License
-Personal, non-commercial use only. You may read the source code and build it for your own personal use; you may not sell it, redistribute it, or use it in any commercial product or service. See LICENSE.
+### Debug Launch Flags
+- `-WBAutoStreamMagnet '<magnet>'` — Start streaming a specific magnet link instantly at launch.
+- `-WBAutoStreamFileIndex N` — Select a specific file inside a multi-file torrent pack.
+- `-WBAutoSeekScript '40:+300,80:-120'` — Run scripted timeline seeks for testing.
+
+*(Metrics are logged to `Documents/diagnostics/metrics.jsonl` in Debug builds).*
+
+---
+
+## Contact & Support
+
+Questions, bug reports, and feature ideas are always welcome:
+- **Telegram**: [@PlainPerson](https://t.me/PlainPerson)
+- **GitHub Issues**: Open an issue on this repository for bug reports or feature requests.
+
+---
+
+## License
+
+Personal, non-commercial use only. You may read the source code and build it for your own personal use; you may not sell it, redistribute it, or use it in any commercial product or service. See [LICENSE](LICENSE).
