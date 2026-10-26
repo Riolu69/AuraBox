@@ -1,250 +1,931 @@
 //
-//  MediaDetailModel.swift
-//  SceneBox
+//  MediaDetailView.swift
+//  Aura
 //
-//  Created by SpontaneousArray on 10.08.26.
+//  Created by Riolu.
 //
 
-import Foundation
-import Observation
+import SwiftUI
 import Kingfisher
 
-// MARK: - Встроенный переводчик для Модели
-fileprivate func tr(_ key: String) -> String {
-    let lang = UserDefaults.standard.string(forKey: "appLanguage") ?? "ru"
-    guard lang == "ru" else { return key }
-    let dict: [String: String] = [
-        "Choose a release to stream": "Выберите источник для просмотра",
-        "Choose a release to download": "Выберите источник для скачивания",
-        "Finding sources…": "Поиск источников…",
-        "Checking which are alive…": "Проверка доступности…",
-        "No sources available for this title.": "Нет доступных источников для этого видео.",
-        "Failed to load data. The catalog server might be blocking your IP/VPN with a Cloudflare CAPTCHA, causing a format error. Try turning off your VPN or switching the server.": "Не удалось загрузить данные. Проверьте соединение или отключите VPN."
-    ]
-    return dict[key] ?? key
-}
-
-@MainActor
-@Observable
-final class MediaDetailModel {
+struct MediaDetailView: View {
     let mediaID: String
     let type: MediaType
+    let fallbackTitle: String
 
-    private(set) var detail: MediaDetail?
-    private(set) var castMembers: [CastMember] = []
-    private(set) var originalLanguage: String?
-    private(set) var similar: [MediaResult] = []
-    private(set) var isLoading = false
-    private(set) var errorMessage: String?
-    private(set) var imagesReady = false
+    @State private var model: MediaDetailModel
+    @State private var streamer = StreamCoordinator()
+    @State private var pendingPlay: (() -> Void)?
+    @State private var isAutoResolving = false
+    @State private var batchStatus: String?
+    @State private var batchMessage: String?
+    @State private var toast: ToastMessage?
+    @State private var resumeAt: Duration = .zero
+    @Environment(DownloadStore.self) private var downloads
+    @Environment(AppSettings.self) private var settings
+    @Environment(WatchProgressStore.self) private var progressStore
+    @Environment(WatchlistStore.self) private var watchlist
+    @Environment(PlanToWatchStore.self) private var planStore
+    @Environment(\.openURL) private var openURL
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dismiss) private var dismiss
 
-    var isReady: Bool { detail != nil && imagesReady }
-
-    var selectedSeason: Int = 1
-
-    var releaseRequest: ReleaseRequest?
-    private(set) var releases: [TorrentStream] = []
-    private(set) var assessments: [String: SourceRanking.Assessment] = [:]
-    private(set) var isLoadingReleases = false
-    private(set) var releaseStage = tr("Finding sources…")
-    private(set) var releaseError: String?
-
-    @ObservationIgnored private var search: TorrentSearch
-    @ObservationIgnored private var loadTask: Task<Void, Never>?
-    @ObservationIgnored private var releaseTask: Task<Void, Never>?
-    @ObservationIgnored private let settings: AppSettings
-
-    init(mediaID: String, type: MediaType, settings: AppSettings? = nil) {
+    init(mediaID: String, type: MediaType, fallbackTitle: String) {
         self.mediaID = mediaID
         self.type = type
-        let settings = settings ?? .shared
-        self.settings = settings
+        self.fallbackTitle = fallbackTitle
+        _model = State(initialValue: MediaDetailModel(mediaID: mediaID, type: type))
+    }
+
+    var body: some View {
+        content
+            .animation(.smooth(duration: 0.35), value: model.isReady)
+            .toast($toast)
+            .overlay { if isAutoResolving || batchStatus != nil { resolvingOverlay } }
+            .alert("Some episodes weren't added",
+                   isPresented: Binding(get: { batchMessage != nil }, set: { if !$0 { batchMessage = nil } })) {
+                Button("OK", role: .cancel) { batchMessage = nil }
+            } message: {
+                Text(batchMessage ?? "")
+            }
+            .background(Theme.background)
+            #if os(iOS)
+            .ignoresSafeArea(edges: .top)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar(Platform.isMac ? .hidden : .automatic, for: .navigationBar)
+            .overlay(alignment: .topLeading) {
+                if Platform.isMac {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 40, height: 40)
+                            .background(Theme.surface.opacity(0.8), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.escape, modifiers: [])
+                    .padding(16)
+                    .accessibilityLabel("Back")
+                }
+            }
+            #else
+            .ignoresSafeArea()
+            .toolbar(.hidden, for: .navigationBar)
+            #endif
+            .navigationTitle(Platform.isMac ? displayTitle : "")
+            .inlineNavigationBar()
+            #if os(iOS)
+            .onChange(of: displayTitle, initial: true) { _, title in MacWindow.setTitle(title) }
+            .onDisappear { MacWindow.setTitle("") }
+            #endif
+            .task { model.load() }
+            .onDisappear {
+                if !streamer.isPresenting { streamer.stop() }
+            }
+            #if os(tvOS)
+            .fullScreenCover(item: releaseRequestBinding, onDismiss: runPendingPlay) { request in
+                ReleasePickerView(model: model, request: request) { stream in
+                    handle(request: request, stream: stream)
+                }
+                .environment(settings)
+                .environment(downloads)
+                .environment(progressStore)
+                .environment(watchlist)
+            }
+            #else
+            .sheet(item: releaseRequestBinding, onDismiss: runPendingPlay) { request in
+                ReleasePickerView(model: model, request: request) { stream in
+                    handle(request: request, stream: stream)
+                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+                .environment(settings)
+                .environment(downloads)
+                .environment(progressStore)
+                .environment(watchlist)
+            }
+            #endif
+            .fullScreenCover(isPresented: Binding(get: { streamer.isPresenting },
+                                                  set: { if !$0 { streamer.stop() } })) {
+                StreamPlayerContainer(streamer: streamer)
+                    .environment(settings)
+                    .environment(downloads)
+                    .environment(progressStore)
+                    .environment(watchlist)
+            }
+    }
+
+    private var displayTitle: String {
+        if let name = model.detail?.name, !name.isEmpty { return name }
+        return fallbackTitle
+    }
+
+    private var releaseRequestBinding: Binding<MediaDetailModel.ReleaseRequest?> {
+        Binding(get: { model.releaseRequest },
+                set: { if $0 == nil { model.dismissReleases() } })
+    }
+
+    private func runPendingPlay() {
+        let action = pendingPlay
+        pendingPlay = nil
+        action?()
+    }
+
+    private var resolvingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+            VStack(spacing: 12) {
+                ProgressView().tint(.white)
+                Text(batchStatus ?? "Finding best source…")
+                    .font(.callout)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(24)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .environment(\.colorScheme, .dark)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if model.isReady, let detail = model.detail {
+            #if os(tvOS)
+            TVDetailView(
+                detail: detail,
+                fallbackTitle: fallbackTitle,
+                isBusy: streamer.isPreparing,
+                cast: model.castMembers,
+                selectedSeason: Binding(get: { model.selectedSeason },
+                                        set: { model.selectedSeason = $0 }),
+                resumeEpisode: resumeEpisode(for: detail),
+                watchLabel: resumeLabel(for: detail),
+                watchProgress: watchProgressFraction(for: detail),
+                watchedEpisodes: progressStore.watchedEpisodes(for: mediaID),
+                similar: model.similar,
+                onWatch: { watch(episode: $0) },
+                onDownload: { requestDownload(episode: $0) },
+                onSetWatched: { setWatched($1, episode: $0, detail: detail) }
+            )
+            #else
+            detailScroll(detail)
+                .transition(.opacity)
+            #endif
+        } else if model.detail == nil, let message = model.errorMessage {
+            EmptyStateView(systemImage: "wifi.exclamationmark",
+                           title: "Couldn’t load this title", message: message,
+                           actionTitle: "Try again") { model.load() }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ProgressView()
+                .tint(.primary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
+        }
+    }
+
+    private func detailScroll(_ detail: MediaDetail) -> some View {
+        ZStack {
+            if Platform.isMac {
+                GeometryReader { proxy in
+                    KFImage(detail.backdropURL)
+                        .resizable()
+                        .fade(duration: 0.3)
+                        .placeholder { Theme.surface }
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                        .overlay {
+                            ZStack {
+                                Color.black.opacity(0.45)
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: .clear, location: 0.0),
+                                        .init(color: .clear, location: 0.35),
+                                        .init(color: Theme.background.opacity(0.85), location: 0.75),
+                                        .init(color: Theme.background, location: 1.0),
+                                    ],
+                                    startPoint: .top, endPoint: .bottom)
+                            }
+                        }
+                }
+                .ignoresSafeArea()
+            }
+            detailScrollContent(detail)
+        }
+    }
+
+    private func detailScrollContent(_ detail: MediaDetail) -> some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 24) {
+                BannerHeader(detail: detail, fallbackTitle: fallbackTitle)
+
+                actions(for: detail)
+                metadata(for: detail)
+                if let synopsis = detail.description, !synopsis.isEmpty {
+                    Section("Synopsis") { Text(synopsis).font(.callout) }
+                }
+                if !model.castMembers.isEmpty || !detail.cast.isEmpty {
+                    CastRow(members: model.castMembers, names: detail.cast)
+                }
+                crew(for: detail)
+                if detail.type == .series, !detail.seasons.isEmpty {
+                    EpisodeSection(
+                        detail: detail,
+                        selectedSeason: Binding(
+                            get: { model.selectedSeason },
+                            set: { model.selectedSeason = $0 }),
+                        watchedEpisodes: progressStore.watchedEpisodes(for: mediaID),
+                        episodeFraction: { progressStore.episodeFraction(mediaID: mediaID, episodeID: $0.id) },
+                        onWatch: { watch(episode: $0) },
+                        onDownload: { requestDownload(episode: $0) },
+                        onDownloadEpisodes: { downloadEpisodes($0) },
+                        onSetWatched: { setWatched($1, episode: $0, detail: detail) }
+                    )
+                }
+                moreLikeThis
+            }
+            .padding(.bottom, 40)
+        }
+    }
+
+    private func actions(for detail: MediaDetail) -> some View {
+        let watchFraction = watchProgressFraction(for: detail)
         
-        // Возвращаем оригинальный и надежный Stremio (Cinemeta) как основной источник
-        let defaultCinemeta = "https://v3-cinemeta.strem.io"
-        var sources = settings.streamSourceBases
-        if !sources.contains(where: { $0.contains("cinemeta") }) {
-            sources.insert(defaultCinemeta, at: 0)
+        return VStack(spacing: 16) {
+            Button {
+                watch(episode: resumeEpisode(for: detail))
+            } label: {
+                VStack(spacing: 6) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                        Text(resumeLabel(for: detail) ?? "Watch")
+                            .lineLimit(1)
+                        if isWatchTargetDownloaded(for: detail) {
+                            Image(systemName: "arrow.down.circle.fill").font(.caption)
+                        }
+                    }
+                    if let watchFraction {
+                        WatchProgressBar(fraction: watchFraction)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 3)
+                            .padding(.horizontal, 4)
+                    }
+                }
+                .font(.headline)
+                .foregroundStyle(Theme.onAccent)
+                .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+            .clipShape(Capsule())
+
+            HStack(spacing: 16) {
+                if detail.type == .series {
+                    Menu {
+                        if let episode = firstEpisode(of: detail) {
+                            Button {
+                                requestDownload(episode: episode)
+                            } label: {
+                                Label("Download \(episode.label)", systemImage: "arrow.down.circle")
+                            }
+                        }
+                        let season = detail.episodes(inSeason: model.selectedSeason)
+                        Button {
+                            downloadEpisodes(season)
+                        } label: {
+                            Label(model.selectedSeason == 0 ? "Download All Specials" : "Download Season \(model.selectedSeason)",
+                                  systemImage: "square.and.arrow.down.on.square")
+                        }
+                        .disabled(season.isEmpty)
+                    } label: {
+                        secondaryButtonLabel(icon: "arrow.down")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.primary)
+                    .clipShape(Circle())
+                } else {
+                    let isDownloaded = downloads.isDownloaded(mediaID: mediaID)
+                    Button {
+                        requestDownload(episode: firstEpisode(of: detail))
+                    } label: {
+                        secondaryButtonLabel(icon: isDownloaded ? "arrow.down.circle.fill" : "arrow.down")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(isDownloaded ? Theme.success : .primary)
+                    .clipShape(Circle())
+                }
+
+                Button {
+                    watchlist.toggle(id: mediaID, mediaType: type,
+                                     title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                     posterURL: detail.posterURL)
+                } label: {
+                    secondaryButtonLabel(icon: isInWatchlist ? "bookmark.fill" : "bookmark")
+                }
+                .buttonStyle(.bordered)
+                .tint(isInWatchlist ? Theme.accent : .primary)
+                .clipShape(Circle())
+                .sensoryFeedback(.selection, trigger: isInWatchlist)
+                
+                let isPlanned = planStore.contains(mediaID)
+                Button {
+                    planStore.toggle(id: mediaID, mediaType: type,
+                                     title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                     posterURL: detail.posterURL)
+                    toast = ToastMessage(text: isPlanned ? "Удалено из планов" : "Добавлено в Буду смотреть",
+                                         systemImage: isPlanned ? "calendar.badge.minus" : "calendar.badge.plus")
+                } label: {
+                    secondaryButtonLabel(icon: isPlanned ? "calendar.badge.clock" : "calendar")
+                }
+                .buttonStyle(.bordered)
+                .tint(isPlanned ? Theme.accent : .primary)
+                .clipShape(Circle())
+                .sensoryFeedback(.selection, trigger: isPlanned)
+
+                if detail.type == .movie {
+                    let watched = progressStore.isMovieWatched(mediaID)
+                    Button {
+                        progressStore.setMovieWatched(!watched, id: mediaID,
+                                                      title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                                      posterURL: detail.posterURL)
+                        toast = ToastMessage(text: watched ? "Marked as unwatched" : "Marked as watched",
+                                             systemImage: watched ? "eye.slash" : "checkmark.circle.fill")
+                    } label: {
+                        secondaryButtonLabel(icon: watched ? "checkmark.circle.fill" : "checkmark")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(watched ? Theme.accent : .primary)
+                    .clipShape(Circle())
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
-        
-        self.search = TorrentSearch(sourceBases: sources)
+        .frame(maxWidth: Platform.isMac ? 480 : .infinity, alignment: .center)
+        .padding(.horizontal, 20)
+        .disabled(streamer.isPreparing || isAutoResolving || batchStatus != nil)
     }
 
-    deinit {
-        loadTask?.cancel()
-        releaseTask?.cancel()
+    private func secondaryButtonLabel(icon: String) -> some View {
+        Image(systemName: icon)
+            .font(.title2)
+            .frame(width: 24, height: 24)
+            .padding(10)
     }
 
-    struct ReleaseRequest: Identifiable, Equatable {
-        enum Intent { case watch, download }
+    private var isInWatchlist: Bool { watchlist.contains(mediaID) }
 
-        let intent: Intent
-        let episode: Episode?
+    private func firstEpisode(of detail: MediaDetail) -> Episode? {
+        guard detail.type == .series else { return nil }
+        return detail.episodes(inSeason: model.selectedSeason).first
+    }
 
-        var id: String { "\(intent)-\(episode?.id ?? "movie")" }
+    // MARK: - Watch / Download
 
-        var title: String {
-            switch intent {
-            case .watch: return tr("Choose a release to stream")
-            case .download: return tr("Choose a release to download")
+    private func watch(episode: Episode?) {
+        resumeAt = startPosition(for: episode)
+        if let download = downloads.completedDownload(mediaID: mediaID, episodeLabel: episode?.label) {
+            playOffline(download, episode: episode)
+        } else {
+            watchByStreaming(episode: episode)
+        }
+    }
+
+    private func watchByStreaming(episode: Episode?) {
+        guard settings.autoSelectSource else {
+            model.requestReleases(intent: .watch, episode: episode)
+            return
+        }
+        Task {
+            isAutoResolving = true
+            let ranked = await model.rankedStreams(for: episode)
+            isAutoResolving = false
+            if let stream = ranked.first {
+                startWatch(stream: stream, episode: episode,
+                           fallbacks: Array(ranked.dropFirst().filter { !$0.isDebrid }))
+            } else { model.requestReleases(intent: .watch, episode: episode) }
+        }
+    }
+
+    private func playOffline(_ download: Download, episode: Episode?) {
+        Task {
+            guard let url = await downloads.localFileURL(for: download) else {
+                watchByStreaming(episode: episode)
+                return
+            }
+            let detail = model.detail
+            let name = detail?.name ?? fallbackTitle
+            let label = [name, episode?.label].compactMap { $0 }.joined(separator: " · ")
+            let startAt = resumeAt
+            resumeAt = .zero
+            let subtitleContext = SubtitleContext(
+                imdbID: mediaID, type: type,
+                season: episode?.season, episode: episode?.episode)
+                .withRelease(download.record.localRelativePath ?? download.record.releaseName)
+                .withSource(SourceKey.make(streamID: download.record.torrentKey,
+                                           fileIndex: download.record.fileIndex))
+            let progressContext = WatchProgressContext(
+                mediaID: mediaID, mediaType: type, title: name, posterURL: detail?.posterURL,
+                season: episode?.season, episode: episode?.episode, episodeID: episode?.id)
+            streamer.playLocalFile(at: url, title: label, subtitleContext: subtitleContext,
+                                   episodes: makeEpisodePlaylist(current: episode, detail: detail),
+                                   startAt: startAt, progress: progressContext,
+                                   originalAudioLanguage: model.originalLanguage)
+        }
+    }
+
+    private func isWatchTargetDownloaded(for detail: MediaDetail) -> Bool {
+        downloads.isDownloaded(mediaID: mediaID,
+                               episodeLabel: resumeEpisode(for: detail)?.label)
+    }
+
+    private func requestDownload(episode: Episode?) {
+        guard settings.autoSelectSource else {
+            model.requestReleases(intent: .download, episode: episode)
+            return
+        }
+        Task {
+            isAutoResolving = true
+            let stream = await model.bestStream(for: episode)
+            isAutoResolving = false
+            if let stream { download(stream: stream, episode: episode) }
+            else { model.requestReleases(intent: .download, episode: episode) }
+        }
+    }
+
+    private func downloadEpisodes(_ episodes: [Episode]) {
+        let now = Date()
+        let wanted = episodes
+            .filter { episode in
+                if let released = episode.released, released > now { return false }
+                guard let existing = downloads.download(mediaID: mediaID, episodeLabel: episode.label) else { return true }
+                return existing.phase == .failed || existing.phase == .paused
+            }
+            .sorted { ($0.season, $0.episode) < ($1.season, $1.episode) }
+        guard !wanted.isEmpty, batchStatus == nil else { return }
+
+        var toResolve: [Episode] = []
+        for episode in wanted {
+            if let existing = downloads.download(mediaID: mediaID, episodeLabel: episode.label) {
+                downloads.resume(existing)
+            } else {
+                toResolve.append(episode)
+            }
+        }
+        guard !toResolve.isEmpty else { return }
+
+        batchStatus = "Finding sources… 0 of \(toResolve.count)"
+        Task {
+            var found: [Int: TorrentStream] = [:]
+            var finished = 0
+            await withTaskGroup(of: (Int, TorrentStream?).self) { group in
+                var next = 0
+                func enqueue() {
+                    guard next < toResolve.count else { return }
+                    let index = next, episode = toResolve[index]
+                    next += 1
+                    group.addTask { (index, await model.bestStream(for: episode)) }
+                }
+                for _ in 0..<min(3, toResolve.count) { enqueue() }
+                for await (index, stream) in group {
+                    if let stream { found[index] = stream }
+                    finished += 1
+                    batchStatus = "Finding sources… \(finished) of \(toResolve.count)"
+                    enqueue()
+                }
+            }
+            var missing: [String] = []
+            for (index, episode) in toResolve.enumerated() {
+                if let stream = found[index] {
+                    download(stream: stream, episode: episode, announce: false)
+                } else {
+                    missing.append(episode.label)
+                }
+            }
+            batchStatus = nil
+            let added = toResolve.count - missing.count
+            if added > 0 {
+                toast = ToastMessage(text: added == 1 ? "Added 1 episode to Downloads"
+                                                      : "Added \(added) episodes to Downloads",
+                                     systemImage: "arrow.down.circle.fill")
+            }
+            if !missing.isEmpty {
+                batchMessage = "No sources found for \(missing.joined(separator: ", ")). Try them one by one or check your source settings."
             }
         }
     }
 
-    // MARK: - Metadata
+    private func handle(request: MediaDetailModel.ReleaseRequest, stream: TorrentStream) {
+        let fallbacks = model.fallbacks(after: stream)
+        model.dismissReleases()
+        switch request.intent {
+        case .watch:
+            pendingPlay = { startWatch(stream: stream, episode: request.episode, fallbacks: fallbacks) }
+        case .download:
+            download(stream: stream, episode: request.episode)
+        }
+    }
 
-    func load() {
-        guard detail == nil, !isLoading else { return }
-        isLoading = true
-        errorMessage = nil
+    private func startWatch(stream: TorrentStream, episode: Episode?, fallbacks: [TorrentStream] = []) {
+        let detail = model.detail
+        let name = detail?.name ?? fallbackTitle
+        let label = [name, episode?.label].compactMap { $0 }.joined(separator: " · ")
+        let backdrop = detail?.backdropURL ?? detail?.posterURL
+        let logo = detail?.logoURL
+        let subtitleContext = SubtitleContext(
+            imdbID: mediaID, type: type,
+            season: episode?.season, episode: episode?.episode)
+            .withRelease(stream.title)
+            .withSource(SourceKey.make(stream))
 
-        loadTask = Task { [mediaID, type, search] in
-            do {
-                let fetched = try await search.detail(id: mediaID, type: type)
-                guard !Task.isCancelled else { return }
-                detail = fetched
-                selectedSeason = fetched.seasons.first ?? 1
+        let playlist = makeEpisodePlaylist(current: episode, detail: detail)
 
-                await Self.prefetch([fetched.backdropURL, fetched.logoURL])
-                guard !Task.isCancelled else { return }
-                imagesReady = true
+        let startAt = resumeAt
+        resumeAt = .zero
+        let progressContext = WatchProgressContext(
+            mediaID: mediaID, mediaType: type, title: name,
+            posterURL: detail?.posterURL,
+            season: episode?.season, episode: episode?.episode, episodeID: episode?.id)
 
-                async let cast: Void = loadCast(for: fetched)
-                async let related: Void = loadSimilar(for: fetched)
-                _ = await (cast, related)
-            } catch {
-                guard !Task.isCancelled else { return }
-                errorMessage = "\(error.localizedDescription)"
+        if stream.isDebrid, let url = stream.url {
+            SourceMemory.remember(stream, mediaID: mediaID, season: episode?.season, episode: episode?.episode)
+            streamer.playDebrid(url: url, title: label, backdropURL: backdrop, logoURL: logo,
+                                subtitleContext: subtitleContext, episodes: playlist,
+                                startAt: startAt, progress: progressContext,
+                                originalAudioLanguage: model.originalLanguage)
+        } else {
+            streamer.play(stream, title: label, backdropURL: backdrop, logoURL: logo,
+                          subtitleContext: subtitleContext, episodes: playlist,
+                          startAt: startAt, resumeFraction: resumeFraction(for: episode),
+                          progress: progressContext,
+                          originalAudioLanguage: model.originalLanguage,
+                          fallbacks: fallbacks)
+        }
+    }
+
+    // MARK: - Resume ("Continue Watching")
+
+    private var savedProgress: WatchProgress? { progressStore.progress(for: mediaID) }
+
+    private func resumeEpisode(for detail: MediaDetail) -> Episode? {
+        guard detail.type != .movie else { return nil }
+        let watched = progressStore.watchedEpisodes(for: mediaID)
+        guard let saved = savedProgress, let epID = saved.episodeID,
+              let idx = detail.episodes.firstIndex(where: { $0.id == epID })
+        else {
+            guard !watched.isEmpty else { return firstEpisode(of: detail) }
+            return detail.episodes.first { !watched.contains($0.label) } ?? firstEpisode(of: detail)
+        }
+        if saved.isFinished {
+            let following = detail.episodes[(idx + 1)...]
+            if let next = following.first(where: { !watched.contains($0.label) }) { return next }
+            return following.first ?? detail.episodes[idx]
+        }
+        return detail.episodes[idx]
+    }
+
+    private func setWatched(_ watched: Bool, episode: Episode, detail: MediaDetail) {
+        progressStore.setWatched(watched, episode: episode, mediaID: mediaID, mediaType: type,
+                                 title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                 posterURL: detail.posterURL)
+    }
+
+    private func resumeLabel(for detail: MediaDetail, compact: Bool = false) -> String? {
+        if detail.type == .movie {
+            guard let saved = savedProgress, !saved.isFinished else { return nil }
+            return "Resume"
+        }
+        guard let ep = resumeEpisode(for: detail) else { return nil }
+        let code = "S\(ep.season)E\(ep.episode)"
+        if compact { return code }
+        let resuming = savedProgress.map { !$0.isFinished && $0.episodeID == ep.id } ?? false
+        return resuming ? "Resume \(code)" : "Watch \(code)"
+    }
+
+    private func watchProgressFraction(for detail: MediaDetail) -> Double? {
+        guard let saved = savedProgress, !saved.isFinished, saved.fraction > 0 else { return nil }
+        if detail.type == .movie { return min(saved.fraction, 1) }
+        guard let ep = resumeEpisode(for: detail), saved.episodeID == ep.id else { return nil }
+        return min(saved.fraction, 1)
+    }
+
+    private func startPosition(for episode: Episode?) -> Duration {
+        guard let saved = savedProgress, !saved.isFinished else { return .zero }
+        if type == .movie { return .seconds(saved.positionSeconds) }
+        guard let episode, saved.episodeID == episode.id else { return .zero }
+        return .seconds(saved.positionSeconds)
+    }
+
+    private func resumeFraction(for episode: Episode?) -> Double? {
+        guard let saved = savedProgress, !saved.isFinished, saved.fraction > 0 else { return nil }
+        if type == .movie { return saved.fraction }
+        guard let episode, saved.episodeID == episode.id else { return nil }
+        return saved.fraction
+    }
+
+    private func download(stream: TorrentStream, episode: Episode?, announce: Bool = true) {
+        let detail = model.detail
+        if announce {
+            toast = ToastMessage(text: episode.map { "Downloading \($0.label)" } ?? "Download started",
+                                 systemImage: "arrow.down.circle.fill")
+        }
+        downloads.add(
+            stream: stream,
+            title: detail?.name ?? fallbackTitle,
+            mediaID: mediaID,
+            mediaType: type,
+            posterURL: detail?.posterURL,
+            episode: episode)
+    }
+
+    private func makeEpisodePlaylist(current: Episode?, detail: MediaDetail?) -> EpisodePlaylist? {
+        guard let current, let detail, !detail.episodes.isEmpty else { return nil }
+        return EpisodePlaylist(current: current, all: detail.episodes, mediaID: mediaID) { episode in
+            playEpisode(episode)
+        }
+    }
+
+    private func playEpisode(_ episode: Episode) {
+        if let download = downloads.completedDownload(mediaID: mediaID, episodeLabel: episode.label) {
+            playOffline(download, episode: episode)
+            return
+        }
+        Task {
+            let ranked = await model.rankedStreams(for: episode)
+            if let stream = ranked.first {
+                startWatch(stream: stream, episode: episode,
+                           fallbacks: Array(ranked.dropFirst().filter { !$0.isDebrid }))
             }
-            isLoading = false
         }
     }
 
-    private func loadCast(for detail: MediaDetail) async {
-        guard let tmdbID = detail.moviedbID,
-              let tmdb = TMDBClient(key: settings.tmdbAPIKey) else { return }
-        async let members = tmdb.cast(tmdbID: tmdbID, type: detail.type)
-        async let language = tmdb.originalLanguage(tmdbID: tmdbID, type: detail.type)
-        let (cast, code) = await (members, language)
-        guard !Task.isCancelled else { return }
-        castMembers = cast
-        originalLanguage = code
-    }
-
-    private func loadSimilar(for detail: MediaDetail) async {
-        guard let genre = detail.genres.first, !genre.isEmpty else { return }
-        let items = (try? await search.catalog(type: detail.type, feed: .popular, genre: genre)) ?? []
-        guard !Task.isCancelled else { return }
-        similar = Array(items.filter { $0.id != detail.id }.prefix(20))
-    }
-
-    private static func prefetch(_ urls: [URL?]) async {
-        let targets = urls.compactMap { $0 }
-        guard !targets.isEmpty else { return }
-        await withCheckedContinuation { continuation in
-            ImagePrefetcher(urls: targets, completionHandler: { _, _, _ in
-                continuation.resume()
-            }).start()
-        }
-    }
-
-    // MARK: - Releases
-
-    func requestReleases(intent: ReleaseRequest.Intent, episode: Episode? = nil) {
-        releaseRequest = ReleaseRequest(intent: intent, episode: episode)
-        loadReleases(for: episode)
-    }
-
-    private func loadReleases(for episode: Episode?) {
-        releaseTask?.cancel()
-        releases = []
-        assessments = [:]
-        releaseError = nil
-        releaseStage = tr("Finding sources…")
-        isLoadingReleases = true
-
-        releaseTask = Task { [mediaID, type, search] in
-            do {
-                let found = try await search.streams(
-                    id: mediaID, type: type,
-                    season: episode?.season, episode: episode?.episode)
-                guard !Task.isCancelled else { return }
-
-                releaseStage = tr("Checking which are alive…")
-                let ranked = await rank(found)
-                guard !Task.isCancelled else { return }
-                releases = ranked.streams
-                assessments = ranked.assessments
-                releaseError = releases.isEmpty ? tr("No sources available for this title.") : nil
-            } catch {
-                guard !Task.isCancelled else { return }
-                releaseError = error.localizedDescription
+    private func metadata(for detail: MediaDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if let place = HomeModel.topTenPlaces[mediaID] {
+                        tagView(text: place, systemImage: "flame.fill", tint: .red)
+                    }
+                    if detail.type == .movie, progressStore.isMovieWatched(mediaID) {
+                        tagView(text: "Watched", systemImage: "checkmark", tint: .primary)
+                    }
+                    if let rating = detail.imdbRating {
+                        tagView(text: String(format: "%.1f", rating), systemImage: "star.fill", tint: .yellow)
+                    }
+                    if let runtime = detail.runtime {
+                        tagView(text: runtime, systemImage: "clock")
+                    }
+                    if let trailer = detail.trailerURL {
+                        Button { openURL(trailer) } label: {
+                            tagView(text: "Trailer", systemImage: "play.rectangle.fill", tint: Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Play trailer on YouTube")
+                    }
+                    ForEach(detail.genres, id: \.self) { genre in
+                        tagView(text: genre)
+                    }
+                }
+                .padding(.horizontal, 20)
             }
-            isLoadingReleases = false
         }
     }
 
-    func dismissReleases() {
-        releaseTask?.cancel()
-        releaseRequest = nil
-        releases = []
-        assessments = [:]
-        releaseError = nil
-        isLoadingReleases = false
-    }
-
-    func fallbacks(after stream: TorrentStream, limit: Int = 3) -> [TorrentStream] {
-        Array(releases
-            .filter { $0.id != stream.id && !$0.isDebrid && (assessments[$0.id]?.isPlayable ?? true) }
-            .prefix(limit))
-    }
-
-    func bestStream(for episode: Episode?) async -> TorrentStream? {
-        await rankedStreams(for: episode).first
-    }
-
-    func rankedStreams(for episode: Episode?, limit: Int = 4) async -> [TorrentStream] {
-        let found = (try? await search.streams(
-            id: mediaID, type: type,
-            season: episode?.season, episode: episode?.episode)) ?? []
-        let ranked = await rank(found)
-        var ordered = ranked.streams.filter { ranked.assessments[$0.id]?.isPlayable ?? true }
-        if ordered.isEmpty { ordered = ranked.streams }
-        if let last = SourceMemory.last(mediaID: mediaID, season: episode?.season, episode: episode?.episode),
-           let index = ordered.firstIndex(where: { SourceKey.make($0) == last.sourceKey }) {
-            ordered.insert(ordered.remove(at: index), at: 0)
+    private func tagView(text: String, systemImage: String? = nil, tint: Color = .primary) -> some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage).foregroundStyle(tint)
+            }
+            Text(text).foregroundStyle(.primary)
         }
-        return Array(ordered.prefix(limit))
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.primary.opacity(0.1), in: Capsule())
     }
 
-    private func rank(_ streams: [TorrentStream]) async
-        -> (streams: [TorrentStream], assessments: [String: SourceRanking.Assessment]) {
-        var seen = Set<String>()
-        let unique = streams.filter { seen.insert($0.id).inserted }
-        let preferred = settings.preferredResolution
-        let debridEnabled = settings.debridEnabled
-        let runtime = SourceRanking.runtimeMinutes(detail?.runtime, isSeries: type != .movie)
-
-        async let liveCounts = SwarmHealth.shared.check(unique)
-        async let failedIDs = SwarmHealth.shared.failedIDs()
-        let (live, failed) = await (liveCounts, failedIDs)
-
-        var assessments: [String: SourceRanking.Assessment] = [:]
-        for stream in unique {
-            let key = stream.id.lowercased()
-            let swarm = live[key]
-            let facts = SourceRanking.Facts(
-                listedSeeders: stream.seeders, liveSeeders: swarm?.seeders, liveLeechers: swarm?.leechers,
-                resolution: stream.resolution, sizeBytes: SourceRanking.sizeBytes(stream.sizeText),
-                isDebrid: stream.isDebrid, failedBefore: failed.contains(key))
-            assessments[stream.id] = SourceRanking.assess(facts, preferredResolution: preferred,
-                                                          runtimeMinutes: runtime, debridEnabled: debridEnabled)
+    @ViewBuilder
+    private var moreLikeThis: some View {
+        #if os(iOS)
+        if !model.similar.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("More Like This")
+                    .font(.display(22, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.horizontal, 20)
+                HorizontalShelfScroller {
+                    LazyHStack(alignment: .top, spacing: 12) {
+                        ForEach(model.similar) { item in
+                            PosterLink(item: item) {
+                                PosterCard(item: item).frame(width: PosterMetrics.shelfWidth(sizeClass))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
         }
-        let ordered = unique.enumerated().sorted { a, b in
-            let left = assessments[a.element.id]?.score ?? 0
-            let right = assessments[b.element.id]?.score ?? 0
-            return left != right ? left > right : a.offset < b.offset
-        }.map(\.element)
-        return (ordered, assessments)
+        #endif
+    }
+
+    private func crew(for detail: MediaDetail) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !detail.directors.isEmpty {
+                CreditLine(label: detail.directors.count > 1 ? "Directors" : "Director",
+                           value: detail.directors.joined(separator: ", "))
+            }
+            if !detail.writers.isEmpty {
+                CreditLine(label: detail.writers.count > 1 ? "Writers" : "Writer",
+                           value: detail.writers.joined(separator: ", "))
+            }
+            if let country = detail.country, !country.isEmpty {
+                CreditLine(label: "Country", value: country)
+            }
+            if let awards = detail.awards, !awards.isEmpty {
+                CreditLine(label: "Awards", value: awards)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    @ViewBuilder
+    private func Section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.display(22, weight: .bold))
+                .foregroundStyle(.primary)
+                .accessibilityAddTraits(.isHeader)
+            content()
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+    }
+}
+
+private struct BannerHeader: View {
+    let detail: MediaDetail?
+    let fallbackTitle: String
+
+    private let height: CGFloat = Platform.isMac ? 460 : 420
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            if !Platform.isMac {
+                let height = self.height
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
+                    .overlay {
+                        KFImage(detail?.backdropURL)
+                            .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 1400, height: 1100)))
+                            .cacheOriginalImage()
+                            .resizable()
+                            .fade(duration: 0.25)
+                            .placeholder { Theme.surface }
+                            .scaledToFill()
+                    }
+                    .clipped()
+                    .overlay {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black.opacity(0.55), location: 0.0),
+                                .init(color: .clear, location: 0.28),
+                                .init(color: Theme.background.opacity(0.7), location: 0.68),
+                                .init(color: Theme.background, location: 1.0),
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    }
+                    .visualEffect { content, proxy in
+                        let minY = proxy.frame(in: .scrollView).minY
+                        return content
+                            .scaleEffect(minY > 0 ? 1 + minY / height : 1, anchor: .bottom)
+                            .offset(y: minY > 0 ? 0 : -minY * 0.4)
+                    }
+            }
+
+            titleTreatment
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
+        }
+        .frame(height: height, alignment: .bottomLeading)
+    }
+
+    private var titleTreatment: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let logoURL = detail?.logoURL {
+                KFImage(logoURL)
+                    .resizable()
+                    .placeholder { titleText }
+                    .scaledToFit()
+                    .frame(maxWidth: Platform.isMac ? 360 : 260, maxHeight: Platform.isMac ? 130 : 90, alignment: .leading)
+            } else {
+                titleText
+            }
+
+            if let summary = detail?.summaryLine, !summary.isEmpty {
+                Text(summary)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var titleText: some View {
+        Text(detail?.name ?? fallbackTitle)
+            .font(.largeTitle.weight(.bold))
+            .foregroundStyle(.primary)
+            .lineLimit(3)
+            .minimumScaleFactor(0.7)
+    }
+}
+
+private struct CastRow: View {
+    let members: [CastMember]
+    let names: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Cast")
+                .font(.display(22, weight: .bold))
+                .foregroundStyle(.primary)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.horizontal, 20)
+
+            HorizontalShelfScroller {
+                LazyHStack(alignment: .top, spacing: 12) {
+                    if members.isEmpty {
+                        ForEach(names, id: \.self) { name in
+                            personTile(name: name, role: nil, photo: nil)
+                        }
+                    } else {
+                        ForEach(members) { member in
+                            NavigationLink(value: member) {
+                                personTile(name: member.name, role: member.role, photo: member.photoURL)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
+    private func personTile(name: String, role: String?, photo: URL?) -> some View {
+        VStack(spacing: 8) {
+            Circle()
+                .fill(Theme.surface)
+                .frame(width: 64, height: 64)
+                .overlay {
+                    if let photo {
+                        KFImage(photo)
+                            .resizable()
+                            .placeholder { initialsLabel(name) }
+                            .scaledToFill()
+                    } else {
+                        initialsLabel(name)
+                    }
+                }
+                .clipShape(Circle())
+
+            Text(name)
+                .font(.caption2)
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(width: 80)
+        }
+    }
+
+    private func initialsLabel(_ name: String) -> some View {
+        Text(Self.initials(name))
+            .font(.headline)
+            .foregroundStyle(.secondary)
+    }
+
+    private static func initials(_ name: String) -> String {
+        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined()
+    }
+}
+
+private struct CreditLine: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 78, alignment: .leading)
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
     }
 }
