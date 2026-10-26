@@ -12,6 +12,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Resolve and Patch SwiftVLC dependencies
+        run: |
+          # Сначала запускаем простую генерацию или резолв пакетов, чтобы SwiftVLC скачался в build_output
+          xcodebuild -resolvePackageDependencies -project WatchBox.xcodeproj -scheme WatchBox -derivedDataPath build_output || true
+
+          # Проверяем и патчим Track.swift (ошибка с String(validating:as:))
+          TRACK_FILE="build_output/SourcePackages/checkouts/SwiftVLC/Sources/SwiftVLC/Media/Track.swift"
+          if [ -f "$TRACK_FILE" ]; then
+            echo "Patching SwiftVLC Track.swift..."
+            sed -i '' 's/String(validating: payload, as: UTF8.self)/String(decoding: payload, as: UTF8.self)/g' "$TRACK_FILE"
+          fi
+
+          # Проверяем и патчим PiPController.swift (ошибка с Mutex / доступностью)
+          PIP_FILE="build_output/SourcePackages/checkouts/SwiftVLC/Sources/SwiftVLC/PiP/PiPController.swift"
+          if [ -f "$PIP_FILE" ]; then
+            echo "Patching SwiftVLC PiPController.swift..."
+            sed -i '' 's/public final class PiPController/@available(macOS 14.0, *)\npublic final class PiPController/g' "$PIP_FILE"
+          fi
+
+          # Проверяем и патчим ThumbnailRequest.swift
+          THUMB_FILE="build_output/SourcePackages/checkouts/SwiftVLC/Sources/SwiftVLC/Media/ThumbnailRequest.swift"
+          if [ -f "$THUMB_FILE" ]; then
+            echo "Patching SwiftVLC ThumbnailRequest.swift..."
+            sed -i '' 's/private final class ThumbnailOperation/@available(macOS 14.0, *)\nprivate final class ThumbnailOperation/g' "$THUMB_FILE"
+          fi
+
       - name: Build Mac Catalyst app
         run: |
           xcodebuild clean build \
