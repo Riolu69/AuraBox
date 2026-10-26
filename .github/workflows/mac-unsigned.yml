@@ -1,0 +1,39 @@
+name: Build Mac (Unsigned Test)
+
+# Позволяет запускать сборку вручную из вкладки Actions
+on: 
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    name: Build Unsigned Mac App
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Mac Catalyst app (No Signing)
+        # Собираем проект, жестко отключая проверку подписей
+        run: |
+          xcodebuild clean build \
+            -project WatchBox.xcodeproj \
+            -scheme WatchBox \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath build_output
+
+      - name: Zip the .app for download
+        # Архивируем .app в .zip, иначе GitHub сломает структуру файлов при загрузке
+        run: |
+          cd build_output/Build/Products/Release-maccatalyst
+          zip -r SceneBox-Mac-Unsigned.zip *.app
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SceneBox-Mac-Unsigned
+          path: build_output/Build/Products/Release-maccatalyst/SceneBox-Mac-Unsigned.zip
