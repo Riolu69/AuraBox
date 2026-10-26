@@ -55,13 +55,21 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('WatchBox.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
+      - name: Clean broken binary artifacts
+        run: |
+          if [ ! -d "build/SourcePackages/artifacts/swiftvlc/libvlc/libvlc.xcframework" ]; then
+            echo "Cleaning incomplete SwiftVLC artifacts..."
+            rm -rf build/SourcePackages/artifacts/swiftvlc
+          fi
+
       - name: Resolve Package Dependencies
         run: |
           xcodebuild \
             -project WatchBox.xcodeproj \
             -scheme WatchBox \
             -resolvePackageDependencies \
-            -clonedSourcePackagesDirPath "$PACKAGES"
+            -clonedSourcePackagesDirPath "$PACKAGES" \
+            -skipPackagePluginValidation
 
       - name: Build (Release, unsigned)
         run: |
