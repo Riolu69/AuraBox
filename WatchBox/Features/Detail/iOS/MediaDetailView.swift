@@ -1,8 +1,8 @@
 //
 //  MediaDetailView.swift
-//  SceneBox
+//  Aura
 //
-//  Created by SpontaneousArray on 19.08.26.
+//  Created by Riolu.
 //
 
 import SwiftUI
@@ -25,7 +25,7 @@ struct MediaDetailView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(WatchProgressStore.self) private var progressStore
     @Environment(WatchlistStore.self) private var watchlist
-    @Environment(PlanToWatchStore.self) private var planStore // Добавлено хранилище планов
+    @Environment(PlanToWatchStore.self) private var planStore
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dismiss) private var dismiss
@@ -247,23 +247,20 @@ struct MediaDetailView: View {
         }
     }
 
+    // MARK: - ИСПРАВЛЕННЫЙ БЛОК КНОПОК
     private func actions(for detail: MediaDetail) -> some View {
         let watchFraction = watchProgressFraction(for: detail)
-        let labelHeight: CGFloat = 32
-        return HStack(spacing: 12) {
+        
+        return VStack(spacing: 16) {
+            // ШИРОКАЯ КНОПКА PLAY
             Button {
                 watch(episode: resumeEpisode(for: detail))
             } label: {
                 VStack(spacing: 6) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "play.fill")
-                        ViewThatFits(in: .horizontal) {
-                            Text(resumeLabel(for: detail) ?? "Watch")
-                                .lineLimit(1)
-                            Text(resumeLabel(for: detail, compact: true) ?? "Watch")
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                        }
+                        Text(resumeLabel(for: detail) ?? "Watch")
+                            .lineLimit(1)
                         if isWatchTargetDownloaded(for: detail) {
                             Image(systemName: "arrow.down.circle.fill").font(.caption)
                         }
@@ -275,110 +272,111 @@ struct MediaDetailView: View {
                             .padding(.horizontal, 4)
                     }
                 }
-                .fontWeight(.semibold)
+                .font(.headline)
                 .foregroundStyle(Theme.onAccent)
-                .frame(maxWidth: .infinity, minHeight: labelHeight)
-                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
-            .layoutPriority(1)          // the main action keeps its label; the rest are icons
+            .clipShape(Capsule()) // Делает кнопку идеально овальной
 
-            if detail.type == .series {
-                Menu {
-                    if let episode = firstEpisode(of: detail) {
-                        Button {
-                            requestDownload(episode: episode)
-                        } label: {
-                            Label("Download \(episode.label)", systemImage: "arrow.down.circle")
+            // ОСТАЛЬНЫЕ КНОПКИ (ниже)
+            HStack(spacing: 16) {
+                if detail.type == .series {
+                    Menu {
+                        if let episode = firstEpisode(of: detail) {
+                            Button {
+                                requestDownload(episode: episode)
+                            } label: {
+                                Label("Download \(episode.label)", systemImage: "arrow.down.circle")
+                            }
                         }
-                    }
-                    let season = detail.episodes(inSeason: model.selectedSeason)
-                    Button {
-                        downloadEpisodes(season)
+                        let season = detail.episodes(inSeason: model.selectedSeason)
+                        Button {
+                            downloadEpisodes(season)
+                        } label: {
+                            Label(model.selectedSeason == 0 ? "Download All Specials" : "Download Season \(model.selectedSeason)",
+                                  systemImage: "square.and.arrow.down.on.square")
+                        }
+                        .disabled(season.isEmpty)
                     } label: {
-                        Label(model.selectedSeason == 0 ? "Download All Specials" : "Download Season \(model.selectedSeason)",
-                              systemImage: "square.and.arrow.down.on.square")
+                        secondaryButtonLabel(icon: "arrow.down")
                     }
-                    .disabled(season.isEmpty)
-                } label: {
-                    Image(systemName: "arrow.down.circle")
-                        .frame(minHeight: labelHeight)
-                        .padding(.vertical, 4)
+                    .buttonStyle(.bordered)
+                    .tint(.primary)
+                    .clipShape(Circle())
+                } else {
+                    let isDownloaded = downloads.isDownloaded(mediaID: mediaID)
+                    Button {
+                        requestDownload(episode: firstEpisode(of: detail))
+                    } label: {
+                        secondaryButtonLabel(icon: isDownloaded ? "arrow.down.circle.fill" : "arrow.down")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(isDownloaded ? Theme.success : .primary)
+                    .clipShape(Circle())
                 }
-                .buttonStyle(.bordered)
-                .tint(.primary)
-                .accessibilityLabel("Download")
-            } else {
-                Button {
-                    requestDownload(episode: firstEpisode(of: detail))
-                } label: {
-                    Image(systemName: downloads.isDownloaded(mediaID: mediaID) ? "arrow.down.circle.fill" : "arrow.down.circle")
-                        .frame(minHeight: labelHeight)
-                        .padding(.vertical, 4)
-                }
-                .buttonStyle(.bordered)
-                .tint(downloads.isDownloaded(mediaID: mediaID) ? Theme.success : .primary)
-                .accessibilityLabel("Download")
-            }
 
-            // Избранное
-            Button {
-                watchlist.toggle(id: mediaID, mediaType: type,
-                                 title: detail.name.isEmpty ? fallbackTitle : detail.name,
-                                 posterURL: detail.posterURL)
-            } label: {
-                Image(systemName: isInWatchlist ? "bookmark.fill" : "bookmark")
-                    .frame(minHeight: labelHeight)
-                    .padding(.vertical, 4)
-            }
-            .buttonStyle(.bordered)
-            .tint(isInWatchlist ? Theme.accent : .primary)
-            .sensoryFeedback(.selection, trigger: isInWatchlist)
-            .accessibilityLabel(isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist")
-            
-            // НОВАЯ КНОПКА: Буду смотреть
-            let isPlanned = planStore.contains(mediaID)
-            Button {
-                planStore.toggle(id: mediaID, mediaType: type,
-                                 title: detail.name.isEmpty ? fallbackTitle : detail.name,
-                                 posterURL: detail.posterURL)
-                toast = ToastMessage(text: isPlanned ? "Удалено из планов" : "Добавлено в Буду смотреть",
-                                     systemImage: isPlanned ? "calendar.badge.minus" : "calendar.badge.plus")
-            } label: {
-                Image(systemName: isPlanned ? "calendar.badge.clock" : "calendar")
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(minHeight: labelHeight)
-                    .padding(.vertical, 4)
-            }
-            .buttonStyle(.bordered)
-            .tint(isPlanned ? Theme.accent : .primary)
-            .sensoryFeedback(.selection, trigger: isPlanned)
-            .accessibilityLabel(isPlanned ? "Удалить из Буду смотреть" : "Добавить в Буду смотреть")
-
-            if detail.type == .movie {
-                let watched = progressStore.isMovieWatched(mediaID)
+                // Избранное
                 Button {
-                    progressStore.setMovieWatched(!watched, id: mediaID,
-                                                  title: detail.name.isEmpty ? fallbackTitle : detail.name,
-                                                  posterURL: detail.posterURL)
-                    toast = ToastMessage(text: watched ? "Marked as unwatched" : "Marked as watched",
-                                         systemImage: watched ? "eye.slash" : "checkmark.circle.fill")
+                    watchlist.toggle(id: mediaID, mediaType: type,
+                                     title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                     posterURL: detail.posterURL)
                 } label: {
-                    Image(systemName: watched ? "checkmark.circle.fill" : "checkmark.circle")
-                        .contentTransition(.symbolEffect(.replace))
-                        .frame(minHeight: labelHeight)
-                        .padding(.vertical, 4)
+                    secondaryButtonLabel(icon: isInWatchlist ? "bookmark.fill" : "bookmark")
                 }
                 .buttonStyle(.bordered)
-                .tint(watched ? Theme.accent : .primary)
-                .accessibilityLabel(watched ? "Mark as unwatched" : "Mark as watched")
+                .tint(isInWatchlist ? Theme.accent : .primary)
+                .clipShape(Circle())
+                .sensoryFeedback(.selection, trigger: isInWatchlist)
+                
+                // Буду смотреть
+                let isPlanned = planStore.contains(mediaID)
+                Button {
+                    planStore.toggle(id: mediaID, mediaType: type,
+                                     title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                     posterURL: detail.posterURL)
+                    toast = ToastMessage(text: isPlanned ? "Удалено из планов" : "Добавлено в Буду смотреть",
+                                         systemImage: isPlanned ? "calendar.badge.minus" : "calendar.badge.plus")
+                } label: {
+                    secondaryButtonLabel(icon: isPlanned ? "calendar.badge.clock" : "calendar")
+                }
+                .buttonStyle(.bordered)
+                .tint(isPlanned ? Theme.accent : .primary)
+                .clipShape(Circle())
+                .sensoryFeedback(.selection, trigger: isPlanned)
+
+                // Просмотрено
+                if detail.type == .movie {
+                    let watched = progressStore.isMovieWatched(mediaID)
+                    Button {
+                        progressStore.setMovieWatched(!watched, id: mediaID,
+                                                      title: detail.name.isEmpty ? fallbackTitle : detail.name,
+                                                      posterURL: detail.posterURL)
+                        toast = ToastMessage(text: watched ? "Marked as unwatched" : "Marked as watched",
+                                             systemImage: watched ? "eye.slash" : "checkmark.circle.fill")
+                    } label: {
+                        secondaryButtonLabel(icon: watched ? "checkmark.circle.fill" : "checkmark")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(watched ? Theme.accent : .primary)
+                    .clipShape(Circle())
+                }
+                
+                Spacer() // Толкает иконки влево
             }
         }
-        .controlSize(.large)
         .frame(maxWidth: Platform.isMac ? 480 : .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .disabled(streamer.isPreparing || isAutoResolving || batchStatus != nil)
+    }
+
+    // Хелпер для ровных круглых кнопок
+    private func secondaryButtonLabel(icon: String) -> some View {
+        Image(systemName: icon)
+            .font(.title2)
+            .frame(width: 24, height: 24)
+            .padding(10)
     }
 
     private var isInWatchlist: Bool { watchlist.contains(mediaID) }
@@ -667,36 +665,51 @@ struct MediaDetailView: View {
         }
     }
 
+    // MARK: - ИСПРАВЛЕННЫЙ БЛОК ТЕГОВ (не сливаются с белым фоном)
     private func metadata(for detail: MediaDetail) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     if let place = HomeModel.topTenPlaces[mediaID] {
-                        Chip(text: place, systemImage: "flame.fill")
+                        tagView(text: place, systemImage: "flame.fill", tint: .red)
                     }
                     if detail.type == .movie, progressStore.isMovieWatched(mediaID) {
-                        Chip(text: "Watched", systemImage: "checkmark", tint: .primary)
+                        tagView(text: "Watched", systemImage: "checkmark", tint: .primary)
                     }
                     if let rating = detail.imdbRating {
-                        Chip(text: String(format: "%.1f", rating), systemImage: "star.fill", tint: .yellow)
+                        tagView(text: String(format: "%.1f", rating), systemImage: "star.fill", tint: .yellow)
                     }
                     if let runtime = detail.runtime {
-                        Chip(text: runtime, systemImage: "clock")
+                        tagView(text: runtime, systemImage: "clock")
                     }
                     if let trailer = detail.trailerURL {
                         Button { openURL(trailer) } label: {
-                            Chip(text: "Trailer", systemImage: "play.rectangle.fill", tint: Theme.accent)
+                            tagView(text: "Trailer", systemImage: "play.rectangle.fill", tint: Theme.accent)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Play trailer on YouTube")
                     }
                     ForEach(detail.genres, id: \.self) { genre in
-                        Chip(text: genre)
+                        tagView(text: genre)
                     }
                 }
                 .padding(.horizontal, 20)
             }
         }
+    }
+
+    // Хелпер для читаемых тегов с контрастным полупрозрачным фоном
+    private func tagView(text: String, systemImage: String? = nil, tint: Color = .primary) -> some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage).foregroundStyle(tint)
+            }
+            Text(text).foregroundStyle(.primary)
+        }
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.primary.opacity(0.1), in: Capsule())
     }
 
     @ViewBuilder
