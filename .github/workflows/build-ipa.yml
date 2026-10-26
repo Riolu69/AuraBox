@@ -52,15 +52,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.PACKAGES }}
-          key: spm-${{ runner.os }}-${{ hashFiles('WatchBox.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
+          key: spm-v2-${{ runner.os }}-${{ hashFiles('WatchBox.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: spm-v2-${{ runner.os }}-
 
-      - name: Clean broken binary artifacts
+      - name: Clear stale binary artifacts
         run: |
-          if [ ! -d "build/SourcePackages/artifacts/swiftvlc/libvlc/libvlc.xcframework" ]; then
-            echo "Cleaning incomplete SwiftVLC artifacts..."
-            rm -rf build/SourcePackages/artifacts/swiftvlc
-          fi
+          rm -rf build/SourcePackages/artifacts
+          rm -rf build/SourcePackages/repositories
 
       - name: Resolve Package Dependencies
         run: |
